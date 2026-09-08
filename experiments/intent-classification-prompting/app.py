@@ -61,7 +61,7 @@ def render_prompt_calls(prompts_used: list[list[dict]]) -> None:
 
 st.markdown(
     """
-    <div style="background:linear-gradient(135deg, #A78BFA, #F0ABFC);padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
+    <div style="background:linear-gradient(135deg, #7C3AED, #C4B5FD);padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
         <h1 style="color:white;margin:0;font-size:2rem;">Intent Classification: Comparing Prompting Techniques</h1>
     </div>
     """,
