@@ -2,6 +2,8 @@
 
 This experiment compares seven ways to ask a small open model to classify a customer support message into one of 77 fine grained banking intents. It also measures what each way costs to run.
 
+**[Live dashboard](https://llm-agentic-architectures-learning-8nn36axsm2lvbifxk8w4tt.streamlit.app/)**
+
 **In short:** retrieving relevant examples for each query worked far better than every other technique (90.5% accuracy, compared to 44% to 67% for the rest). A fixed set of static examples barely beat having no examples at all. Splitting the decision into two steps, first the group then the intent, made accuracy worse, not better. Self consistency's extra voting cost three times the tokens and did not pay for itself.
 
 ## Setup
@@ -67,7 +69,7 @@ flowchart LR
 
 Every technique had a 0% error rate across all 1,617 calls. Label validity stayed at or above 98.7% throughout. Llama 3.1 8B followed the strict JSON instruction reliably no matter the technique.
 
-See the full results, exact prompts, and confusion matrices in the Streamlit dashboard ([app.py](app.py)). Run it with `streamlit run app.py`.
+See the full results, exact prompts, and confusion matrices in the [live dashboard](https://llm-agentic-architectures-learning-8nn36axsm2lvbifxk8w4tt.streamlit.app/), or run [app.py](app.py) locally with `streamlit run app.py`.
 
 ## What we learned
 

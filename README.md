@@ -4,7 +4,7 @@ Notes, experiments, and small projects exploring large language models and agent
 
 ## Experiments
 
-* [Intent Classification: Comparing Prompting Techniques](experiments/intent-classification-prompting/README.md): 7 prompting techniques compared on Banking77, with a Streamlit dashboard showing exact prompts, accuracy, and operational cost side by side.
+* [Intent Classification: Comparing Prompting Techniques](experiments/intent-classification-prompting/README.md): 7 prompting techniques compared on Banking77, with a Streamlit dashboard showing exact prompts, accuracy, and operational cost side by side. [Live dashboard](https://llm-agentic-architectures-learning-8nn36axsm2lvbifxk8w4tt.streamlit.app/).
 
 ## Contents
 
