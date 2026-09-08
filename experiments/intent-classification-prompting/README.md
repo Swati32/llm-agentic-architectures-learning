@@ -24,12 +24,12 @@ This two field schema is what makes several metrics below possible. Coarse Accur
 
 ```mermaid
 flowchart LR
-    A[Banking77 test set] --> B[Stratified sample: 231 queries]
-    B --> C{7 prompting techniques}
-    C --> D[llama3.1:8b via Ollama]
-    D --> E["Parsed response:\ncoarse group + intent"]
-    E --> F[Quality metrics]
-    E --> G[Operational metrics]
+    A["Banking77 test set"] --> B["Stratified sample of 231 queries"]
+    B --> C{"7 prompting techniques"}
+    C --> D["llama3.1:8b via Ollama"]
+    D --> E["Parsed response: coarse group and intent"]
+    E --> F["Quality metrics"]
+    E --> G["Operational metrics"]
 ```
 
 ## Techniques compared
@@ -81,14 +81,14 @@ See the full results, exact prompts, and confusion matrices in the [live dashboa
 
 ```mermaid
 flowchart TD
-    subgraph Single call techniques
-        Q1[Query] --> M1["Model sees the full query\nand the full label catalog at once"]
-        M1 --> R1[Group and intent chosen together]
+    subgraph single["Single call techniques"]
+        Q1["Query"] --> M1["Model sees the full query and the full label catalog at once"]
+        M1 --> R1["Group and intent chosen together"]
     end
-    subgraph Hierarchical, two calls
-        Q2[Query] --> M2[Model picks only the group]
-        M2 --> M3[Model picks the intent, from that group only]
-        M3 --> R2[Group is locked in before intent level reasoning happens]
+    subgraph hier["Hierarchical: two calls"]
+        Q2["Query"] --> M2["Model picks only the group"]
+        M2 --> M3["Model picks the intent from that group only"]
+        M3 --> R2["Group is locked in before intent level reasoning happens"]
     end
 ```
 
