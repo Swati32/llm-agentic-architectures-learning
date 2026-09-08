@@ -71,6 +71,15 @@ Each experiment README should read like a short blog post:
 - What we learned (results, surprises, caveats)
 - References to the papers/research that motivated the experiment
 
+## README writing guidelines
+
+These apply to every README.md in this repo.
+
+* Write in simple, easy to read language. No fluff, no filler sentences.
+* Never use a dash ("-" or "—") as punctuation inside a sentence. Rewrite the sentence instead, or split it into two sentences. (Hyphens inside a single word, like "zero-shot" or "coarse-to-fine", are fine.)
+* Every paper or external reference must be a clickable link, not just a name and year.
+* Mermaid diagrams and images are welcome wherever a picture explains the setup or a result faster than text. Keep them simple.
+
 ## Tooling
 
 - Hugging Face `datasets` library for all data
