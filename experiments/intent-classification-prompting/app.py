@@ -59,13 +59,19 @@ def render_prompt_calls(prompts_used: list[list[dict]]) -> None:
         render_messages(messages)
 
 
-st.title("Intent Classification: Comparing Prompting Techniques")
-st.caption("Experiment 1 of the LLM & Agentic Architectures learning project")
+st.markdown(
+    """
+    <div style="background-color:#2563EB;padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
+        <h1 style="color:white;margin:0;font-size:2rem;">Intent Classification: Comparing Prompting Techniques</h1>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 if not RESULTS_PATH.exists():
     st.warning(
         "No results yet. Run `python run_experiment.py` in this experiment's "
-        "folder first — this dashboard reads from `results/records.json`."
+        "folder first. This dashboard reads from `results/records.json`."
     )
     st.stop()
 
