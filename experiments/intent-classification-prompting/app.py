@@ -4,6 +4,7 @@ explorer for seeing every technique's answer to the same question side by side.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -44,10 +45,37 @@ def load_records() -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
+CATALOG_LINE = re.compile(r"^ {0,4}- .+$")
+CATALOG_MIN_LINES_TO_COLLAPSE = 12  # short lists (e.g. the 10 group names) stay as-is
+
+
+def collapse_label_catalog(content: str) -> str:
+    """The full 77-intent catalog repeats in almost every prompt and drowns
+    out what's actually distinctive about each technique. Collapse any long
+    run of catalog-style bullet lines into a one-line placeholder."""
+    lines = content.split("\n")
+    collapsed = []
+    i = 0
+    while i < len(lines):
+        if CATALOG_LINE.match(lines[i]):
+            start = i
+            while i < len(lines) and CATALOG_LINE.match(lines[i]):
+                i += 1
+            block_length = i - start
+            if block_length >= CATALOG_MIN_LINES_TO_COLLAPSE:
+                collapsed.append(f"[... {block_length} lines of the label catalog omitted, see taxonomy.py ...]")
+            else:
+                collapsed.extend(lines[start:i])
+        else:
+            collapsed.append(lines[i])
+            i += 1
+    return "\n".join(collapsed)
+
+
 def render_messages(messages: list[dict]) -> None:
     for message in messages:
         with st.chat_message(message["role"]):
-            st.text(message["content"])
+            st.text(collapse_label_catalog(message["content"]))
 
 
 def render_prompt_calls(prompts_used: list[list[dict]]) -> None:
