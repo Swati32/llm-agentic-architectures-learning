@@ -2,6 +2,8 @@
 
 This experiment compares six ways to fine-tune a large language model: full fine-tuning, and five parameter-efficient fine-tuning (PEFT) techniques from four different design families. It does not run any training. Instead, it computes real trainable-parameter counts and memory footprints directly from a model's architecture, for the concrete scenario of fine-tuning `llama3.1:8b` to summarize dialogues.
 
+**[Live dashboard](https://swati-peft-comparison.streamlit.app/)**
+
 **In short:** full fine-tuning needs about 120GB of memory to train `llama3.1:8b`. LoRA gets the same model tuned in about 15GB, using only 0.04% of its parameters as trainable, because Adam's optimizer state, not the weights themselves, is what full fine-tuning actually pays for. QLoRA takes that same 15GB down to under 4GB, but not by training fewer parameters than LoRA. It trains the exact same 3.4 million parameters; it just shrinks the frozen 8 billion by storing them in 4-bit instead of 16-bit. And BitFit, a technique that trains only a model's bias terms, has nothing to train at all on `llama3.1:8b`: Llama's architecture has no bias terms to begin with.
 
 ## Terminology
@@ -117,7 +119,7 @@ Reference model: `llama3.1:8b`, 8,030,261,248 parameters.
 
 In short, LoRA and QLoRA win on raw memory because their update sits alongside the frozen weights and merges away after training. Adapters and prefix-tuning both add something that stays around at inference time, in different forms (a module for Adapters, context space for prefix-tuning), which the parameter and memory numbers alone don't fully capture.
 
-See the full numbers, charts, and a per-technique deep-dive by running the dashboard locally with `streamlit run app.py` (see Reproducing this, below).
+See the full numbers, charts, and a per-technique deep-dive in the [live dashboard](https://swati-peft-comparison.streamlit.app/), or run it locally with `streamlit run app.py`.
 
 ### LoRA: trainable parameters scale linearly with rank
 

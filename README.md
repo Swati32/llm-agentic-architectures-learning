@@ -5,7 +5,7 @@ Notes, experiments, and small projects exploring large language models and agent
 ## Experiments
 
 * [Intent Classification: Comparing Prompting Techniques](experiments/intent-classification-prompting/README.md): 7 prompting techniques compared on Banking77, with a Streamlit dashboard showing exact prompts, accuracy, and operational cost side by side. [Live dashboard](https://llm-agentic-architectures-learning-8nn36axsm2lvbifxk8w4tt.streamlit.app/).
-* [PEFT, LoRA, and QLoRA: A Theoretical Comparison](experiments/peft-comparison/README.md): full fine-tuning against five parameter-efficient fine-tuning techniques from four design families, compared by real trainable-parameter counts and memory footprints computed against `llama3.1:8b`'s architecture. No training run involved; run `streamlit run app.py` locally to view.
+* [PEFT, LoRA, and QLoRA: A Theoretical Comparison](experiments/peft-comparison/README.md): full fine-tuning against five parameter-efficient fine-tuning techniques from four design families, compared by real trainable-parameter counts and memory footprints computed against `llama3.1:8b`'s architecture. No training run involved. [Live dashboard](https://swati-peft-comparison.streamlit.app/).
 
 ## Roadmap
 
