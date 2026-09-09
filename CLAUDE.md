@@ -92,7 +92,7 @@ These apply to every README.md in this repo.
 * Mermaid diagrams and images are welcome wherever a picture explains the setup or a result faster than text. Keep them simple.
 * Every finding in "What we learned" needs a theorized *why*, not just a description of what happened. Ground the theory in a cited paper or a mechanism (how the model or technique actually works), not speculation stated as fact. "Retrieval won by 20 points" is not a finished finding; "retrieval won by 20 points, likely because X, per [paper]" is.
 * When a feature is removed or changed, grep every README (and the portfolio blog post, if one exists for that experiment) for references to it in the same change. Stale mentions of removed features are worse than no mention.
-* When an experiment's README gets deeper analysis later, mirror that depth into its portfolio blog post too (condensed for blog pacing, same citations), so the two don't drift apart.
+* Standing practice: whenever an experiment's README changes in a way that affects its findings, conclusions, or citations, in the same turn update the corresponding post in the `portfolio-website` repo's blog too (condensed for blog pacing, same citations). Don't treat this as optional or a later cleanup step. If no post exists yet for that experiment, say so and ask whether to create one, rather than silently skipping it.
 
 ## Model backend
 
