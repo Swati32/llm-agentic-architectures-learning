@@ -16,7 +16,9 @@ Only move to implementation once these are settled.
 
 ## Flagging notable findings
 
-If a result during an experiment looks paper worthy (surprising, counter to what the grounding research would predict, or a clean enough effect to stand on its own), say so in chat as soon as you notice it. Don't just fold it quietly into the README's learnings section and move on.
+If a result during an experiment looks paper worthy, say so in chat as soon as you notice it. Don't just fold it quietly into the README's learnings section and move on.
+
+Before flagging, check whether the effect is already established elsewhere, in a different field, under a different name, not just in LLM prompting research specifically. A result that has a clean, already-published explanation (even from an unrelated field, like classical ML) is a confirmation, not a finding. Say that plainly rather than calling it paper worthy. Flag something only when existing research doesn't already predict or explain it.
 
 ## Repo structure
 

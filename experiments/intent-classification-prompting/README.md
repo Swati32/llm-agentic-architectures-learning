@@ -81,7 +81,9 @@ Here is a theory for why the gap is this large, not just present. One account of
 
 The same bias mechanism from point 1 explains why fixed few-shot is not just unhelpful but mildly counterproductive for its cost. The 10 demonstrations set an implicit expectation for what a normal answer looks like, one of these 10 groups, and the model has to fight that expectation on every query whose true intent is not among them ([Zhao et al., 2021](https://arxiv.org/abs/2102.09690)). Zero-shot has no such anchor pulling it toward the wrong set of options. Fixed few-shot mostly teaches output format, not classification, and the small accuracy gain it does provide is likely coming from that formatting help rather than from the examples being useful demonstrations.
 
-**3. Splitting the decision into group first, then intent, made things worse.** This was the most surprising result. The hierarchical technique scored lowest on every quality metric, including Coarse Accuracy at 56.7%. That is the worst coarse score of all seven techniques, well below the roughly 82% every other technique gets for the same judgment made together with the intent.
+**3. Splitting the decision into group first, then intent, made things worse.** The hierarchical technique scored lowest on every quality metric, including Coarse Accuracy at 56.7%. That is the worst coarse score of all seven techniques, well below the roughly 82% every other technique gets for the same judgment made together with the intent.
+
+This is not a new discovery. It is a clean, small scale replication of a known effect. Hierarchical classification research has documented this exact failure mode for decades: a top down classifier that decides the coarse category first, then the fine one within it, suffers from error propagation, sometimes called the "blocking problem", where a wrong decision at the top level dooms every decision below it, and a flat classifier that decides the fine label directly does not have this weakness ([Silla and Freitas, 2011](https://www.cs.kent.ac.uk/people/staff/aaf/pub_papers.dir/DMKD-J-2010-Silla.pdf)). Our hierarchical technique is exactly this kind of top down, local classifier design, just implemented as two LLM calls instead of two trained models. Getting a worse result than the flat techniques is the expected outcome for that design, not a surprise.
 
 ```mermaid
 flowchart TD
@@ -131,6 +133,7 @@ The 10 group taxonomy is this project's own construction, not an official Bankin
 * [Sprague et al., 2024, To CoT or not to CoT? Chain-of-thought helps mainly on math and symbolic reasoning](https://arxiv.org/abs/2409.12183)
 * [Yao et al., 2023, Tree of Thoughts: Deliberate Problem Solving with Large Language Models](https://arxiv.org/abs/2305.10601)
 * [Besta et al., 2023, Graph of Thoughts: Solving Elaborate Problems with Large Language Models](https://arxiv.org/abs/2308.09687)
+* [Silla and Freitas, 2011, A Survey of Hierarchical Classification Across Different Application Domains](https://www.cs.kent.ac.uk/people/staff/aaf/pub_papers.dir/DMKD-J-2010-Silla.pdf)
 
 ## Reproducing this
 
