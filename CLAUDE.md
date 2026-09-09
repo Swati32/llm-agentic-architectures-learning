@@ -2,6 +2,10 @@
 
 Mini learning apps that explore LLM and agentic architecture techniques using Hugging Face — datasets from the `datasets` library, apps built in Streamlit. Every app's purpose is to compare techniques side by side, not just demo one.
 
+## Git workflow
+
+Commit straight to `main`. This is a personal learning repo with a single contributor, so skip the usual "branch first, then merge" step and commit directly, overriding the general default of branching off the repo's default branch before committing.
+
 ## Starting a new experiment
 
 Before writing any code, discuss and agree on:
