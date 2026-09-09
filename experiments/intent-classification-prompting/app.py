@@ -202,6 +202,16 @@ with tab_comparison:
     st.scatter_chart(tradeoff, x="mean_latency_seconds", y="fine_accuracy")
 
 with tab_deep_dive:
+    st.subheader("All technique prompts, side by side")
+    st.caption("Same query for every technique, label catalog collapsed. Pick one below for the full deep dive.")
+    first_query_text = records.iloc[0]["text"]
+    for key, technique in TECHNIQUES.items():
+        with st.expander(f"{technique.NAME}: \"{first_query_text}\""):
+            example_record = records[(records["technique"] == key) & (records["text"] == first_query_text)].iloc[0]
+            render_prompt_calls(example_record["prompts_used"])
+
+    st.divider()
+
     technique_key = st.selectbox(
         "Technique", options=list(TECHNIQUES.keys()), format_func=lambda k: TECHNIQUES[k].NAME
     )
