@@ -1,0 +1,219 @@
+{
+  "reference_model": "llama3.1:8b",
+  "total_params": 8030261248,
+  "scenario": "Fine-tuning llama3.1:8b to summarize SAMSum dialogues",
+  "records": [
+    {
+      "technique": "Full fine-tuning",
+      "family": "Baseline",
+      "trainable_params": 8030261248,
+      "frozen_params": 0,
+      "trainable_pct": 100.0,
+      "memory_gb": 119.66021728515625,
+      "config": {},
+      "mechanism": "Every parameter in the model is trainable. The optimizer keeps a gradient and Adam state for all 8.03B of them.",
+      "why": "This was the only option before PEFT existed: to adapt a pretrained model to a new task, keep training it, letting every parameter move.",
+      "tradeoffs": "Gives the model the most freedom to change, at the highest possible cost: roughly 120GB of memory to train, and a full new copy of the model to store per task, since nothing is shared with the original.",
+      "diagram": "full_finetuning"
+    },
+    {
+      "technique": "LoRA",
+      "family": "Reparameterization",
+      "trainable_params": 3407872,
+      "frozen_params": 8026853376,
+      "trainable_pct": 0.0424378721283664,
+      "memory_gb": 15.001960754394531,
+      "config": {
+        "rank": 8,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ]
+      },
+      "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 8) and added alongside the frozen weight at inference time, instead of modifying it directly.",
+      "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
+      "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "diagram": "lora"
+    },
+    {
+      "technique": "QLoRA",
+      "family": "Reparameterization",
+      "trainable_params": 3407872,
+      "frozen_params": 8026853376,
+      "trainable_pct": 0.0424378721283664,
+      "memory_gb": 3.788576126098633,
+      "config": {
+        "rank": 8,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ],
+        "quantization": "4-bit NF4"
+      },
+      "mechanism": "Exactly LoRA's mechanism (rank 8 update on query and value projections), with one change: the frozen base weights are stored in 4-bit instead of 16-bit. Trainable parameter count is identical to LoRA. Only the frozen weight storage shrinks.",
+      "why": "Built by Dettmers et al., 2023, to fit LoRA fine-tuning of much bigger models onto a single consumer GPU, by shrinking the frozen weights rather than changing what gets trained.",
+      "tradeoffs": "Same LoRA update, a quarter of LoRA's frozen-weight memory. Some precision is lost by storing weights in 4-bit, though the paper's specific quantization scheme (double quantization + the NF4 data type) is designed to keep that loss small enough not to show up in quality.",
+      "diagram": "qlora"
+    },
+    {
+      "technique": "Adapters",
+      "family": "Bottleneck module",
+      "trainable_params": 33820672,
+      "frozen_params": 7996440576,
+      "trainable_pct": 0.42116527663932857,
+      "memory_gb": 15.39849853515625,
+      "config": {
+        "bottleneck_dim": 64,
+        "adapters_per_layer": 2
+      },
+      "mechanism": "Base weights are frozen. A small bottleneck module (down-project to 64 dimensions, nonlinearity, up-project back) is inserted in series after the attention block and after the MLP block, in every layer. Unlike LoRA, these modules sit on the model's main path, so they add a small amount of inference latency that LoRA avoids by merging back into the frozen weights after training.",
+      "why": "One of the earliest PEFT techniques, Houlsby et al., 2019, predating LoRA. Built for the same underlying problem, adapting a large pretrained model to many tasks without storing a full copy per task.",
+      "tradeoffs": "Roughly 10x more trainable parameters than LoRA's default settings on this model, and unlike LoRA's update, an adapter can't be merged back into the frozen weights, so it adds a small permanent cost to every inference call, not just to training. This is part of why LoRA became the more popular default over time.",
+      "diagram": "adapters"
+    },
+    {
+      "technique": "Prefix-tuning",
+      "family": "Soft prompt",
+      "trainable_params": 5242880,
+      "frozen_params": 8025018368,
+      "trainable_pct": 0.06528903404364061,
+      "memory_gb": 15.025886535644531,
+      "config": {
+        "num_virtual_tokens": 20
+      },
+      "mechanism": "Base weights are frozen and untouched. 20 trainable \"virtual token\" key/value vectors are learned for every layer and prepended to that layer's real keys and values during attention, steering what the frozen model attends to without changing any of its weights. Not captured by the parameter count: these virtual tokens also consume 20 positions of the model's context window on every forward pass, a cost this table doesn't show.",
+      "why": "Li & Liang, 2021, built this for generation tasks, on the idea that steering a frozen model's attention with a learned prompt can work almost as well as changing its weights, while touching no weights at all.",
+      "tradeoffs": "No weights are ever touched, which makes it easy to swap between many tasks on the same frozen model. The real cost is context window space, not parameters: every virtual token eats a position that a real token could otherwise use, on every single call.",
+      "diagram": "prefix_tuning"
+    },
+    {
+      "technique": "BitFit",
+      "family": "Selective",
+      "trainable_params": 0,
+      "frozen_params": 8030261248,
+      "trainable_pct": 0.0,
+      "memory_gb": 14.957527160644531,
+      "config": {},
+      "mechanism": "Freeze every weight except the model's existing bias terms, and train only those. Nothing new is added. On llama3.1:8b this selects zero parameters: Llama's linear layers have no bias terms, and its RMSNorm layers have only a weight, no bias, so there is nothing for BitFit to unfreeze on this architecture.",
+      "why": "Zaken et al., 2021, asked how little of a model you could train and still adapt it to a new task, and found that just its existing bias terms, already tiny, already there, were often enough.",
+      "tradeoffs": "Extremely cheap when it applies, since nothing new is added and almost nothing is unfrozen. Whether it applies at all depends entirely on the base model's design: bias-free architectures like Llama give it nothing to work with, which is not a flaw in the technique, just a mismatch with this particular model family.",
+      "diagram": "bitfit"
+    }
+  ],
+  "lora_rank_sweep": [
+    {
+      "technique": "LoRA",
+      "family": "Reparameterization",
+      "trainable_params": 1703936,
+      "frozen_params": 8028557312,
+      "trainable_pct": 0.0212189360641832,
+      "memory_gb": 14.979743957519531,
+      "config": {
+        "rank": 4,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ]
+      },
+      "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 4) and added alongside the frozen weight at inference time, instead of modifying it directly.",
+      "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
+      "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "diagram": "lora"
+    },
+    {
+      "technique": "LoRA",
+      "family": "Reparameterization",
+      "trainable_params": 3407872,
+      "frozen_params": 8026853376,
+      "trainable_pct": 0.0424378721283664,
+      "memory_gb": 15.001960754394531,
+      "config": {
+        "rank": 8,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ]
+      },
+      "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 8) and added alongside the frozen weight at inference time, instead of modifying it directly.",
+      "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
+      "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "diagram": "lora"
+    },
+    {
+      "technique": "LoRA",
+      "family": "Reparameterization",
+      "trainable_params": 6815744,
+      "frozen_params": 8023445504,
+      "trainable_pct": 0.0848757442567328,
+      "memory_gb": 15.046394348144531,
+      "config": {
+        "rank": 16,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ]
+      },
+      "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 16) and added alongside the frozen weight at inference time, instead of modifying it directly.",
+      "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
+      "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "diagram": "lora"
+    },
+    {
+      "technique": "LoRA",
+      "family": "Reparameterization",
+      "trainable_params": 13631488,
+      "frozen_params": 8016629760,
+      "trainable_pct": 0.1697514885134656,
+      "memory_gb": 15.135261535644531,
+      "config": {
+        "rank": 32,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ]
+      },
+      "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 32) and added alongside the frozen weight at inference time, instead of modifying it directly.",
+      "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
+      "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "diagram": "lora"
+    },
+    {
+      "technique": "LoRA",
+      "family": "Reparameterization",
+      "trainable_params": 27262976,
+      "frozen_params": 8002998272,
+      "trainable_pct": 0.3395029770269312,
+      "memory_gb": 15.312995910644531,
+      "config": {
+        "rank": 64,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ]
+      },
+      "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 64) and added alongside the frozen weight at inference time, instead of modifying it directly.",
+      "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
+      "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "diagram": "lora"
+    },
+    {
+      "technique": "LoRA",
+      "family": "Reparameterization",
+      "trainable_params": 54525952,
+      "frozen_params": 7975735296,
+      "trainable_pct": 0.6790059540538624,
+      "memory_gb": 15.668464660644531,
+      "config": {
+        "rank": 128,
+        "target_modules": [
+          "q_proj",
+          "v_proj"
+        ]
+      },
+      "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 128) and added alongside the frozen weight at inference time, instead of modifying it directly.",
+      "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
+      "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "diagram": "lora"
+    }
+  ]
+}

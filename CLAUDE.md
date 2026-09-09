@@ -81,6 +81,7 @@ Each experiment README should read like a short blog post:
 - What we compared and how (dataset, methods, metrics)
 - What we learned (results, surprises, caveats)
 - References to the papers/research that motivated the experiment
+- A Terminology section defining the key technical terms the experiment leans on, in plain language, with enough detail (not just a one-line definition) that a reader unfamiliar with the concepts can follow the rest of the README. Use a concrete example or analogy where it helps. Standing practice for every experiment from here on, not just ones about training internals.
 
 ## README writing guidelines
 

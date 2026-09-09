@@ -1,0 +1,5 @@
+# run_experiment.py is pure Python (arithmetic over the model's published
+# architecture constants, no model weights loaded and no training run), so
+# it needs nothing beyond the standard library. This file exists for
+# consistency with the other experiments in this repo.
+-r requirements.txt
