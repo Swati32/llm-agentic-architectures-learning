@@ -38,5 +38,11 @@ def compute():
             "to work with, which is not a flaw in the technique, just a mismatch with "
             "this particular model family."
         ),
+        "when_to_use": (
+            "Worth trying first, before anything heavier, but only on an architecture "
+            "that actually has bias terms to unfreeze, typically BERT-style encoders "
+            "rather than modern bias-free decoder models like Llama. Check this before "
+            "reaching for it: on the wrong architecture it silently trains nothing."
+        ),
         "diagram": "bitfit",
     }

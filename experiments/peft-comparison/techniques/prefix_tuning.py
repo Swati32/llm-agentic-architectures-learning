@@ -40,5 +40,12 @@ def compute(num_virtual_tokens=NUM_VIRTUAL_TOKENS):
             "not parameters: every virtual token eats a position that a real token "
             "could otherwise use, on every single call."
         ),
+        "when_to_use": (
+            "Reach for this when you need to serve many tasks off the exact same "
+            "frozen weights with nothing to merge or swap at all, and your prompts "
+            "are short enough that losing a few tens of context positions to virtual "
+            "tokens doesn't matter. Less attractive for long-context use cases, where "
+            "that lost space is worth more."
+        ),
         "diagram": "prefix_tuning",
     }

@@ -48,5 +48,12 @@ def compute(rank=8):
             "and the update may not have room to capture everything full fine-tuning "
             "could."
         ),
+        "when_to_use": (
+            "The default choice for adapting an existing model cheaply, when the base "
+            "weights already fit comfortably in memory. Especially good when inference "
+            "speed matters, since the merged model runs exactly as fast as the "
+            "original, and when you want to keep several task-specific variants of the "
+            "same base model around as small adapter files instead of full copies."
+        ),
         "diagram": "lora",
     }

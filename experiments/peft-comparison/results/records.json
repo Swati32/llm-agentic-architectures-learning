@@ -14,6 +14,7 @@
       "mechanism": "Every parameter in the model is trainable. The optimizer keeps a gradient and Adam state for all 8.03B of them.",
       "why": "This was the only option before PEFT existed: to adapt a pretrained model to a new task, keep training it, letting every parameter move.",
       "tradeoffs": "Gives the model the most freedom to change, at the highest possible cost: roughly 120GB of memory to train, and a full new copy of the model to store per task, since nothing is shared with the original.",
+      "when_to_use": "Reach for this when a PEFT technique's constrained update genuinely isn't enough: teaching the model a large amount of new domain knowledge, a very different output format, or a capability far from what it already does, and you have both the compute and a large enough dataset to support changing every parameter without overfitting.",
       "diagram": "full_finetuning"
     },
     {
@@ -33,6 +34,7 @@
       "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 8) and added alongside the frozen weight at inference time, instead of modifying it directly.",
       "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
       "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "when_to_use": "The default choice for adapting an existing model cheaply, when the base weights already fit comfortably in memory. Especially good when inference speed matters, since the merged model runs exactly as fast as the original, and when you want to keep several task-specific variants of the same base model around as small adapter files instead of full copies.",
       "diagram": "lora"
     },
     {
@@ -53,6 +55,7 @@
       "mechanism": "Exactly LoRA's mechanism (rank 8 update on query and value projections), with one change: the frozen base weights are stored in 4-bit instead of 16-bit. Trainable parameter count is identical to LoRA. Only the frozen weight storage shrinks.",
       "why": "Built by Dettmers et al., 2023, to fit LoRA fine-tuning of much bigger models onto a single consumer GPU, by shrinking the frozen weights rather than changing what gets trained.",
       "tradeoffs": "Same LoRA update, a quarter of LoRA's frozen-weight memory. Some precision is lost by storing weights in 4-bit, though the paper's specific quantization scheme (double quantization + the NF4 data type) is designed to keep that loss small enough not to show up in quality.",
+      "when_to_use": "Reach for this specifically when the base model doesn't fit in available GPU memory at 16-bit at all, for example fine-tuning a 70B model on a single consumer GPU. If the model already fits comfortably, plain LoRA avoids QLoRA's small quantization-precision cost for no real benefit.",
       "diagram": "qlora"
     },
     {
@@ -69,6 +72,7 @@
       "mechanism": "Base weights are frozen. A small bottleneck module (down-project to 64 dimensions, nonlinearity, up-project back) is inserted in series after the attention block and after the MLP block, in every layer. Unlike LoRA, these modules sit on the model's main path, so they add a small amount of inference latency that LoRA avoids by merging back into the frozen weights after training.",
       "why": "One of the earliest PEFT techniques, Houlsby et al., 2019, predating LoRA. Built for the same underlying problem, adapting a large pretrained model to many tasks without storing a full copy per task.",
       "tradeoffs": "Roughly 10x more trainable parameters than LoRA's default settings on this model, and unlike LoRA's update, an adapter can't be merged back into the frozen weights, so it adds a small permanent cost to every inference call, not just to training. This is part of why LoRA became the more popular default over time.",
+      "when_to_use": "Mostly of historical interest today now that LoRA covers the same use case without the permanent latency cost. Still reasonable when inference speed genuinely doesn't matter, for example offline batch scoring, or when working in a codebase already built around adapter modules rather than merge-able updates.",
       "diagram": "adapters"
     },
     {
@@ -84,6 +88,7 @@
       "mechanism": "Base weights are frozen and untouched. 20 trainable \"virtual token\" key/value vectors are learned for every layer and prepended to that layer's real keys and values during attention, steering what the frozen model attends to without changing any of its weights. Not captured by the parameter count: these virtual tokens also consume 20 positions of the model's context window on every forward pass, a cost this table doesn't show.",
       "why": "Li & Liang, 2021, built this for generation tasks, on the idea that steering a frozen model's attention with a learned prompt can work almost as well as changing its weights, while touching no weights at all.",
       "tradeoffs": "No weights are ever touched, which makes it easy to swap between many tasks on the same frozen model. The real cost is context window space, not parameters: every virtual token eats a position that a real token could otherwise use, on every single call.",
+      "when_to_use": "Reach for this when you need to serve many tasks off the exact same frozen weights with nothing to merge or swap at all, and your prompts are short enough that losing a few tens of context positions to virtual tokens doesn't matter. Less attractive for long-context use cases, where that lost space is worth more.",
       "diagram": "prefix_tuning"
     },
     {
@@ -97,6 +102,7 @@
       "mechanism": "Freeze every weight except the model's existing bias terms, and train only those. Nothing new is added. On llama3.1:8b this selects zero parameters: Llama's linear layers have no bias terms, and its RMSNorm layers have only a weight, no bias, so there is nothing for BitFit to unfreeze on this architecture.",
       "why": "Zaken et al., 2021, asked how little of a model you could train and still adapt it to a new task, and found that just its existing bias terms, already tiny, already there, were often enough.",
       "tradeoffs": "Extremely cheap when it applies, since nothing new is added and almost nothing is unfrozen. Whether it applies at all depends entirely on the base model's design: bias-free architectures like Llama give it nothing to work with, which is not a flaw in the technique, just a mismatch with this particular model family.",
+      "when_to_use": "Worth trying first, before anything heavier, but only on an architecture that actually has bias terms to unfreeze, typically BERT-style encoders rather than modern bias-free decoder models like Llama. Check this before reaching for it: on the wrong architecture it silently trains nothing.",
       "diagram": "bitfit"
     }
   ],
@@ -118,6 +124,7 @@
       "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 4) and added alongside the frozen weight at inference time, instead of modifying it directly.",
       "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
       "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "when_to_use": "The default choice for adapting an existing model cheaply, when the base weights already fit comfortably in memory. Especially good when inference speed matters, since the merged model runs exactly as fast as the original, and when you want to keep several task-specific variants of the same base model around as small adapter files instead of full copies.",
       "diagram": "lora"
     },
     {
@@ -137,6 +144,7 @@
       "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 8) and added alongside the frozen weight at inference time, instead of modifying it directly.",
       "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
       "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "when_to_use": "The default choice for adapting an existing model cheaply, when the base weights already fit comfortably in memory. Especially good when inference speed matters, since the merged model runs exactly as fast as the original, and when you want to keep several task-specific variants of the same base model around as small adapter files instead of full copies.",
       "diagram": "lora"
     },
     {
@@ -156,6 +164,7 @@
       "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 16) and added alongside the frozen weight at inference time, instead of modifying it directly.",
       "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
       "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "when_to_use": "The default choice for adapting an existing model cheaply, when the base weights already fit comfortably in memory. Especially good when inference speed matters, since the merged model runs exactly as fast as the original, and when you want to keep several task-specific variants of the same base model around as small adapter files instead of full copies.",
       "diagram": "lora"
     },
     {
@@ -175,6 +184,7 @@
       "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 32) and added alongside the frozen weight at inference time, instead of modifying it directly.",
       "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
       "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "when_to_use": "The default choice for adapting an existing model cheaply, when the base weights already fit comfortably in memory. Especially good when inference speed matters, since the merged model runs exactly as fast as the original, and when you want to keep several task-specific variants of the same base model around as small adapter files instead of full copies.",
       "diagram": "lora"
     },
     {
@@ -194,6 +204,7 @@
       "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 64) and added alongside the frozen weight at inference time, instead of modifying it directly.",
       "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
       "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "when_to_use": "The default choice for adapting an existing model cheaply, when the base weights already fit comfortably in memory. Especially good when inference speed matters, since the merged model runs exactly as fast as the original, and when you want to keep several task-specific variants of the same base model around as small adapter files instead of full copies.",
       "diagram": "lora"
     },
     {
@@ -213,6 +224,7 @@
       "mechanism": "Base weights are frozen. For each targeted matrix (query and value projections, in every layer), a low-rank update is learned as two small matrices A and B (rank 128) and added alongside the frozen weight at inference time, instead of modifying it directly.",
       "why": "Introduced by Hu et al., 2021, on the bet that the change a model needs for a new task lives in a much smaller space than its full parameter count (Aghajanyan et al., 2020). If that's true, you only need to learn a small update, not a full new set of weights.",
       "tradeoffs": "Very cheap to train, and after training, A and B can be merged directly into the frozen weight, so a LoRA-tuned model runs at exactly the same speed as the original at inference time. The trade-off is rank: too low and the update may not have room to capture everything full fine-tuning could.",
+      "when_to_use": "The default choice for adapting an existing model cheaply, when the base weights already fit comfortably in memory. Especially good when inference speed matters, since the merged model runs exactly as fast as the original, and when you want to keep several task-specific variants of the same base model around as small adapter files instead of full copies.",
       "diagram": "lora"
     }
   ]

@@ -44,5 +44,12 @@ def compute(bottleneck_dim=BOTTLENECK_DIM):
             "inference call, not just to training. This is part of why LoRA became "
             "the more popular default over time."
         ),
+        "when_to_use": (
+            "Mostly of historical interest today now that LoRA covers the same "
+            "use case without the permanent latency cost. Still reasonable when "
+            "inference speed genuinely doesn't matter, for example offline batch "
+            "scoring, or when working in a codebase already built around adapter "
+            "modules rather than merge-able updates."
+        ),
         "diagram": "adapters",
     }

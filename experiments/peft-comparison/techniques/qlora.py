@@ -33,5 +33,11 @@ def compute(rank=8):
             "specific quantization scheme (double quantization + the NF4 data type) "
             "is designed to keep that loss small enough not to show up in quality."
         ),
+        "when_to_use": (
+            "Reach for this specifically when the base model doesn't fit in available "
+            "GPU memory at 16-bit at all, for example fine-tuning a 70B model on a "
+            "single consumer GPU. If the model already fits comfortably, plain LoRA "
+            "avoids QLoRA's small quantization-precision cost for no real benefit."
+        ),
         "diagram": "qlora",
     }

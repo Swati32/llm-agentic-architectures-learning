@@ -10,6 +10,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+import diagrams
+
 RESULTS_PATH = Path(__file__).parent / "results" / "records.json"
 
 TERMINOLOGY = {
@@ -125,10 +127,52 @@ tab_methodology, tab_comparison, tab_deep_dive = st.tabs(
 with tab_methodology:
     st.header("Goal")
     st.markdown(
-        "Build clear intuition for why parameter-efficient fine-tuning (PEFT) "
-        "methods exist and how they differ mechanically from each other and from "
-        "full fine-tuning, using real computed numbers rather than prose alone, "
-        "without needing an actual training run."
+        "Fine-tuning means continuing to train an already-pretrained model on new "
+        "data, so it picks up a specific task, style, or domain instead of only "
+        "its original general-purpose behavior. The original way to do this was "
+        "full fine-tuning: keep training the model exactly as it was pretrained, "
+        "letting every one of its parameters move. That works, but it gets "
+        "expensive fast. As models grew from millions of parameters to tens of "
+        "billions, full fine-tuning's memory cost grew right along with them, "
+        "since every parameter needs a gradient and optimizer state during "
+        "training, not just storage space (see Terminology below). Full "
+        "fine-tuning a modern model can need well over 100GB of memory and a full "
+        "new copy of the model per task, which puts it out of reach for most "
+        "individual practitioners and makes maintaining many task-specific "
+        "versions of a large model impractical even for teams that can afford it.\n\n"
+        "**Parameter-efficient fine-tuning (PEFT)** is the family of techniques "
+        "built to fix that. Instead of letting every parameter move, each PEFT "
+        "technique finds a small slice of the model, sometimes existing weights, "
+        "sometimes a small number of newly added ones, and trains only that, "
+        "while leaving the rest of the model frozen. The bet underneath all of "
+        "them is that adapting a model to a new task doesn't actually require "
+        "moving every parameter; it requires moving the model in a handful of the "
+        "right directions, which is a much smaller job. When that bet holds, PEFT "
+        "gets most of full fine-tuning's benefit for a small fraction of its cost, "
+        "which is why it's become the default starting point for fine-tuning a "
+        "large model rather than the exception.\n\n"
+        "This experiment's goal is to build clear intuition for why these "
+        "techniques exist and how they differ mechanically from each other and "
+        "from full fine-tuning, using real computed numbers rather than prose "
+        "alone, without needing an actual training run."
+    )
+
+    st.header("When to reach for PEFT at all")
+    st.markdown(
+        "PEFT is not the only alternative to full fine-tuning. For many tasks, a "
+        "well-written prompt, a few in-context examples, or retrieval-augmented "
+        "generation gets a frozen, off-the-shelf model close enough, with no "
+        "training step of any kind (see the "
+        "[intent-classification-prompting](../intent-classification-prompting/README.md) "
+        "experiment, where a good prompting technique on an untouched model beat "
+        "every other technique tried). Fine-tuning, PEFT included, is worth its "
+        "cost once a task needs something prompting can't reliably deliver on its "
+        "own: a consistent output format under pressure, a narrow domain "
+        "vocabulary the base model doesn't already know well, or behavior that "
+        "needs to hold up across a volume of queries too large to keep re-explaining "
+        "in every prompt. Once fine-tuning is worth doing at all, PEFT is almost "
+        "always worth trying before full fine-tuning, precisely because its cost "
+        "is so much lower that there's little to lose by starting there."
     )
 
     st.header("Scenario")
@@ -162,32 +206,34 @@ with tab_comparison:
     st.header("How the five PEFT techniques compare")
     st.markdown(
         "All five PEFT techniques land in the same rough memory range, 3.8GB to "
-        "15.4GB, next to full fine-tuning's 119.66GB. That's the headline: which "
-        "PEFT technique you pick barely matters next to the decision to use PEFT "
-        "at all. The differences between them show up in where the trainable "
-        "parameters actually sit, not in how many there are:\n\n"
-        "- **Cheapest overall: QLoRA (3.79GB).** Same trainable parameters as "
-        "LoRA, quarter the memory, because it also compresses the frozen weights.\n"
-        "- **Cheapest without touching precision: LoRA (15.00GB, 0.0424% "
-        "trainable).** The reference point every other technique here is "
-        "measured against.\n"
-        "- **Most trainable parameters: Adapters (33.8M, roughly 10x LoRA's "
-        "count),** and the only technique here that adds a permanent inference "
-        "cost, since its modules can't be merged back into the frozen weights "
-        "the way LoRA's can.\n"
-        "- **Cheapest by parameter count that still touches weights: Prefix-"
-        "tuning (5.24M),** but its real cost doesn't show up in this table: it "
-        "spends context window positions instead of memory.\n"
-        "- **Zero trainable parameters: BitFit,** not because it's the most "
-        "efficient technique, but because `llama3.1:8b` has no bias terms for "
-        "it to select. On a BERT-style model with biases in every layer, this "
-        "row would look completely different.\n\n"
-        "In short: LoRA and QLoRA win on raw memory because their update sits "
-        "*alongside* the frozen weights and merges away after training. Adapters "
-        "and Prefix-tuning both add something that stays around at inference "
-        "time, in different forms (a module in Adapters' case, context space in "
-        "Prefix-tuning's), which the parameter/memory numbers alone don't fully "
-        "capture."
+        "15.4GB, next to full fine-tuning's 119.66GB. That's the headline worth "
+        "sitting with before the individual numbers: which PEFT technique you "
+        "pick barely matters next to the decision to use PEFT at all. Once "
+        "that's decided, the differences between the five techniques show up in "
+        "where their trainable parameters actually sit, not in how many there "
+        "are.\n\n"
+        "QLoRA comes out cheapest overall, at 3.79GB, but for a specific reason: "
+        "it trains the exact same parameters as LoRA and gets to that number by "
+        "compressing the frozen weights, not by training less. LoRA itself, at "
+        "15.00GB and 0.0424% trainable, is the more useful reference point, "
+        "since it's the number every other technique here is really being "
+        "measured against. Adapters sit at the other end of the parameter count, "
+        "training roughly 10x more than LoRA at 33.8 million parameters, and "
+        "they're the only technique here that adds a permanent inference cost, "
+        "since their modules can't be merged back into the frozen weights the "
+        "way LoRA's can. Prefix-tuning looks cheap by parameter count alone, "
+        "5.24 million, but that count hides its real cost: it spends context "
+        "window positions instead of memory, which this table has no column "
+        "for. And BitFit trains zero parameters here, not because it's the most "
+        "efficient technique on offer, but because `llama3.1:8b` simply has no "
+        "bias terms for it to select; on a BERT-style model with biases in "
+        "every layer, this row would look completely different.\n\n"
+        "The pattern underneath all of this: LoRA and QLoRA win on raw memory "
+        "because their update sits alongside the frozen weights and merges away "
+        "after training, while Adapters and Prefix-tuning both add something "
+        "that stays around at inference time, a module in Adapters' case, "
+        "context space in Prefix-tuning's, in ways the parameter and memory "
+        "numbers alone don't fully capture."
     )
 
     st.subheader("Trainable parameters and memory, all techniques")
@@ -253,9 +299,11 @@ with tab_deep_dive:
     for technique_name in df.index:
         record = df.loc[technique_name]
         with st.expander(f"{technique_name} — {record['family']}"):
+            st.markdown(diagrams.render(record["diagram"]), unsafe_allow_html=True)
             st.markdown(f"**How it works:** {record['mechanism']}")
             st.markdown(f"**Why it exists:** {record['why']}")
             st.markdown(f"**Trade-offs:** {record['tradeoffs']}")
+            st.markdown(f"**When to prefer it:** {record['when_to_use']}")
             if record["config"]:
                 st.markdown(f"**Config:** `{record['config']}`")
             cols = st.columns(3)

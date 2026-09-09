@@ -26,5 +26,12 @@ def compute():
             "roughly 120GB of memory to train, and a full new copy of the model to "
             "store per task, since nothing is shared with the original."
         ),
+        "when_to_use": (
+            "Reach for this when a PEFT technique's constrained update genuinely isn't "
+            "enough: teaching the model a large amount of new domain knowledge, a very "
+            "different output format, or a capability far from what it already does, "
+            "and you have both the compute and a large enough dataset to support "
+            "changing every parameter without overfitting."
+        ),
         "diagram": "full_finetuning",
     }
