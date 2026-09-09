@@ -40,23 +40,24 @@ def compute(rank=8):
             "avoids QLoRA's small quantization-precision cost for no real benefit."
         ),
         "deep_dive": [
-            "Exactly LoRA's mechanism, and exactly LoRA's answer to \"which "
-            "parameters\": the same config choice (query and value projections, rank "
-            f"{rank}) decides where the trainable A and B matrices go, and gradient "
-            "descent decides what they contain. The only change is to the frozen "
-            "weights, which are stored in 4-bit instead of 16-bit; that's a storage "
-            "decision applied uniformly to every frozen parameter, not a selection "
-            "among them.",
-            "Dettmers et al., 2023, built QLoRA to fit LoRA fine-tuning of much "
-            "bigger models onto a single consumer GPU, by shrinking the frozen "
-            "weights rather than changing what gets trained. It gets LoRA's exact "
-            "update at a quarter of LoRA's frozen-weight memory; some precision is "
-            "lost by storing weights in 4-bit, though the paper's specific "
-            "quantization scheme (double quantization plus the NF4 data type) is "
-            "designed to keep that loss small enough not to show up in quality. "
-            "Reach for this specifically when the base model doesn't fit in "
-            "available GPU memory at 16-bit at all; if it already fits comfortably, "
-            "plain LoRA avoids this small precision cost for no real benefit.",
+            "QLoRA does exactly what LoRA does, in exactly the same spots, trained "
+            "in exactly the same way. The only difference is a trick applied to "
+            "the frozen part of the model, the part that isn't being trained: "
+            "instead of storing each of those numbers at normal precision, QLoRA "
+            "squeezes them down into a much smaller format, using a quarter of the "
+            "space. Think of it like saving a photo at a lower resolution: it "
+            "takes up much less room, and if you're careful about how you "
+            "compress it, you can barely tell the difference.",
+            "That's the whole trick, and it's why QLoRA needs about a quarter of "
+            "LoRA's memory here: the savings add up across 8 billion frozen "
+            "numbers. [Dettmers et al., 2023](https://arxiv.org/abs/2305.14314) "
+            "built QLoRA to fit LoRA fine-tuning of much bigger models onto a "
+            "single ordinary GPU, using a specific compression method (double "
+            "quantization plus a format called NF4) chosen to keep the quality "
+            "loss small enough not to be noticeable. This matters most when the "
+            "model doesn't fit on your GPU at normal size at all. If it already "
+            "fits comfortably, there's no real reason to take on QLoRA's small "
+            "loss in precision instead of just using plain LoRA.",
         ],
         "diagram": "qlora",
     }

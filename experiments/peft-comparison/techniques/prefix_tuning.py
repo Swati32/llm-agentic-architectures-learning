@@ -48,23 +48,24 @@ def compute(num_virtual_tokens=NUM_VIRTUAL_TOKENS):
             "that lost space is worth more."
         ),
         "deep_dive": [
-            "Base weights are frozen and completely untouched here, which sidesteps "
-            "the selection question a different way: instead of choosing which "
-            f"existing parameters to train, prefix-tuning adds an entirely new set, "
-            f"{num_virtual_tokens} virtual key/value vectors learned for every "
-            "layer, and prepends them to that layer's real keys and values during "
-            "attention. Which layers get virtual tokens, all of them, here, is "
-            "again a design choice, not something computed from the model.",
+            "This one doesn't touch a single number inside the model, not even by "
+            "adding a side path. Instead, it invents a small set of made-up "
+            f"\"memory tokens\" ({num_virtual_tokens} of them, for every layer), "
+            "numbers that look like something the model would normally pay "
+            "attention to, and quietly slips them in at the very start of every "
+            "layer's attention step, as if they had always been part of the "
+            "conversation. The model was never trained to expect them, but it "
+            "learns to make use of them anyway, since nothing tells it they "
+            "aren't real input.",
             "[Li & Liang, 2021](https://arxiv.org/abs/2101.00190) built this for "
-            "generation tasks, on the idea that steering a frozen model's attention "
-            "with a learned prompt can work almost as well as changing its weights. "
-            "No weights are ever touched, which makes it easy to swap between many "
-            "tasks on the same frozen model; the real cost is context window space, "
-            "since every virtual token eats a position a real token could otherwise "
-            "use. It earns its keep when many tasks need to be served off the exact "
-            "same frozen weights with nothing to merge or swap, and prompts are "
-            "short enough that losing a few tens of context positions doesn't "
-            "matter.",
+            "generation tasks. The upside is that the original model is left "
+            "completely alone, so you can switch between many different "
+            "fine-tuned \"personalities\" just by swapping which made-up tokens "
+            "you slip in. The catch is that those made-up tokens take up space "
+            "that could have gone to actual input, since a model can only pay "
+            "attention to so much text at once. If you only need short prompts, "
+            "that's a small price to pay. If you need long conversations or long "
+            "documents, it adds up.",
         ],
         "diagram": "prefix_tuning",
     }

@@ -52,23 +52,28 @@ def compute(bottleneck_dim=BOTTLENECK_DIM):
             "modules rather than merge-able updates."
         ),
         "deep_dive": [
-            f"Base weights are frozen, and a small bottleneck module, down-project "
-            f"to {bottleneck_dim} dimensions, nonlinearity, up-project back, is "
-            "inserted in series after the attention block and after the MLP block, "
-            "in every layer. Where those insertion points go is fixed by the "
-            "technique's original design, not discovered from the model: every "
-            "layer gets the same two modules, in the same two places, regardless of "
-            "which parameters that particular model relies on most. What the "
-            "modules actually learn is, again, found by ordinary gradient descent.",
-            "Adapters predate LoRA ([Houlsby et al., 2019](https://arxiv.org/abs/1902.00751)) "
-            "and were built for the same underlying problem: adapting a large "
-            "pretrained model to many tasks without storing a full copy per task. "
-            "At default settings, they train roughly 10x more parameters than LoRA "
-            "on this model, and unlike LoRA's update, an adapter module can't be "
-            "merged back into the frozen weights, so it adds a small permanent cost "
-            "to every inference call. That's part of why LoRA displaced Adapters as "
-            "the default; today they're mostly useful when inference speed "
-            "genuinely doesn't matter, or in a codebase already built around them.",
+            "Adapters came before LoRA, and they solve the same problem in a "
+            "slightly different way: instead of adding a side path that runs "
+            "alongside the frozen model, they insert a small new mini-module "
+            "directly into the model's path, so information actually flows "
+            "through it on the way to the next layer. Picture the model as an "
+            "assembly line; Adapters add a small extra station on that line, "
+            f"right after two specific points in every layer (shrink down to "
+            f"{bottleneck_dim} numbers, do a little processing, expand back out).",
+            "That difference matters once training is done. LoRA's side path can "
+            "be folded back in and disappears. An Adapter can't: it's a "
+            "permanent stop on the assembly line, so every time the model is used "
+            "afterward, that extra step is still there, costing a small amount of "
+            "time. It also ends up needing to learn about 10 times more numbers "
+            "than LoRA does here, for a similar job. Adapters "
+            "([Houlsby et al., 2019](https://arxiv.org/abs/1902.00751)) predate "
+            "LoRA and were built for the same underlying problem, adapting a large "
+            "pretrained model to many tasks without storing a full copy per task, "
+            "but that permanent extra step is part of why LoRA became the more "
+            "popular choice over time. Today Adapters mostly make sense when that "
+            "extra bit of time genuinely doesn't matter, like running things "
+            "offline in bulk, or when working with a system already built around "
+            "them.",
         ],
         "diagram": "adapters",
     }

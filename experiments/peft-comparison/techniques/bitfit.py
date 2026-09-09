@@ -45,23 +45,24 @@ def compute():
             "reaching for it: on the wrong architecture it silently trains nothing."
         ),
         "deep_dive": [
-            "This is the one technique here that actually selects from parameters "
-            "that already exist, and it does it with the simplest possible rule: "
-            "freeze everything, then unfreeze every parameter whose role is a bias "
-            "term, identified by name and position in the architecture, not by any "
-            "importance score. On `llama3.1:8b` that rule fires on nothing: Llama's "
-            "linear layers have no bias terms, and its RMSNorm layers have only a "
-            "weight, no bias, so there is nothing for BitFit to unfreeze on this "
-            "architecture.",
-            "[Zaken et al., 2021](https://arxiv.org/abs/2106.10199) asked how "
-            "little of a model you could train and still adapt it, and found that "
-            "just its existing bias terms, already tiny, already there, were often "
-            "enough on the BERT-style models they tested. It's extremely cheap when "
-            "it applies, since nothing new is added and almost nothing is "
-            "unfrozen. It's worth trying first, before anything heavier, but only "
-            "on an architecture that actually has bias terms to unfreeze; check "
-            "this before reaching for it, since on the wrong architecture, like "
-            "this one, it silently trains nothing.",
+            "Every technique so far either adds something new to the model or "
+            "adds a whole new side path. BitFit does neither. It looks at the "
+            "model's existing numbers and asks a simple question about each one: "
+            "is this a \"bias\" number, a small nudge added at the very end of a "
+            "calculation, separate from the main multiplication, or not? If yes, "
+            "it's allowed to train. If no, it stays frozen. Nothing new is added, "
+            "and nothing complicated is decided; it's one simple rule applied "
+            "everywhere.",
+            "Here's the catch, and it's the most interesting result in this whole "
+            "experiment: that rule only works if the model actually has bias "
+            "numbers to find. `llama3.1:8b` doesn't; its design leaves them out "
+            "entirely. So running BitFit's rule against this particular model "
+            "finds nothing to train at all, zero. That's not a flaw in the "
+            "technique, it's a mismatch with this specific model's design. "
+            "[Zaken et al., 2021](https://arxiv.org/abs/2106.10199), who invented "
+            "BitFit, tested it on older-style models that do have bias numbers, "
+            "where it turned out to be one of the cheapest things worth trying "
+            "first, before anything heavier.",
         ],
         "diagram": "bitfit",
     }
