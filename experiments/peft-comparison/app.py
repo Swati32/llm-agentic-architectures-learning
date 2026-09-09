@@ -100,7 +100,7 @@ st.set_page_config(page_title="PEFT / LoRA / QLoRA: Theoretical Comparison", lay
 
 st.markdown(
     """
-    <div style="background:linear-gradient(135deg, #6D28D9, #DB2777);padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
+    <div style="background:linear-gradient(135deg, #5B21B6, #DB2777);padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
         <h1 style="color:white;margin:0;font-size:2rem;">PEFT / LoRA / QLoRA: Theoretical Comparison</h1>
     </div>
     """,
