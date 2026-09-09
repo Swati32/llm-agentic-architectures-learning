@@ -105,7 +105,7 @@ def render_retrieval_note(record: pd.Series) -> None:
 
 st.markdown(
     """
-    <div style="background:linear-gradient(135deg, #7C3AED, #C4B5FD);padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
+    <div style="background:linear-gradient(135deg, #6D28D9, #DB2777);padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
         <h1 style="color:white;margin:0;font-size:2rem;">Intent Classification: Comparing Prompting Techniques</h1>
     </div>
     """,
