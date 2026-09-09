@@ -33,5 +33,20 @@ def compute():
             "and you have both the compute and a large enough dataset to support "
             "changing every parameter without overfitting."
         ),
+        "deep_dive": [
+            "Every parameter in the model is trainable here, so there is no selection "
+            "question to answer at all: the optimizer keeps a gradient and Adam state "
+            "for all 8.03 billion of them. This was the only option before PEFT "
+            "existed, the default way to adapt a pretrained model by continuing to "
+            "train it exactly as it was pretrained.",
+            "It gives the model the most freedom to change, at the highest possible "
+            "cost: roughly 120GB of memory to train `llama3.1:8b`, and a full new copy "
+            "of the model to store per task, since nothing is shared with the "
+            "original. Reach for it when a PEFT technique's constrained update "
+            "genuinely isn't enough, for example teaching the model a large amount of "
+            "new domain knowledge or a capability far from what it already does, and "
+            "only when there's both the compute and a large enough dataset to avoid "
+            "overfitting a fully unfrozen model.",
+        ],
         "diagram": "full_finetuning",
     }

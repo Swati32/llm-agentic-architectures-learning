@@ -300,12 +300,10 @@ with tab_deep_dive:
         record = df.loc[technique_name]
         with st.expander(f"{technique_name} — {record['family']}"):
             st.markdown(diagrams.render(record["diagram"]), unsafe_allow_html=True)
-            st.markdown(f"**How it works:** {record['mechanism']}")
-            st.markdown(f"**Why it exists:** {record['why']}")
-            st.markdown(f"**Trade-offs:** {record['tradeoffs']}")
-            st.markdown(f"**When to prefer it:** {record['when_to_use']}")
+            for paragraph in record["deep_dive"]:
+                st.markdown(paragraph)
             if record["config"]:
-                st.markdown(f"**Config:** `{record['config']}`")
+                st.caption(f"Config: `{record['config']}`")
             cols = st.columns(3)
             cols[0].metric("Trainable Params", f"{record['trainable_params']:,}")
             cols[1].metric("Trainable %", f"{record['trainable_pct']:.4f}%")

@@ -51,5 +51,24 @@ def compute(bottleneck_dim=BOTTLENECK_DIM):
             "scoring, or when working in a codebase already built around adapter "
             "modules rather than merge-able updates."
         ),
+        "deep_dive": [
+            f"Base weights are frozen, and a small bottleneck module, down-project "
+            f"to {bottleneck_dim} dimensions, nonlinearity, up-project back, is "
+            "inserted in series after the attention block and after the MLP block, "
+            "in every layer. Where those insertion points go is fixed by the "
+            "technique's original design, not discovered from the model: every "
+            "layer gets the same two modules, in the same two places, regardless of "
+            "which parameters that particular model relies on most. What the "
+            "modules actually learn is, again, found by ordinary gradient descent.",
+            "Adapters predate LoRA ([Houlsby et al., 2019](https://arxiv.org/abs/1902.00751)) "
+            "and were built for the same underlying problem: adapting a large "
+            "pretrained model to many tasks without storing a full copy per task. "
+            "At default settings, they train roughly 10x more parameters than LoRA "
+            "on this model, and unlike LoRA's update, an adapter module can't be "
+            "merged back into the frozen weights, so it adds a small permanent cost "
+            "to every inference call. That's part of why LoRA displaced Adapters as "
+            "the default; today they're mostly useful when inference speed "
+            "genuinely doesn't matter, or in a codebase already built around them.",
+        ],
         "diagram": "adapters",
     }

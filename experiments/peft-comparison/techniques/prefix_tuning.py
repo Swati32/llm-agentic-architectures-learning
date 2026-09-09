@@ -47,5 +47,24 @@ def compute(num_virtual_tokens=NUM_VIRTUAL_TOKENS):
             "tokens doesn't matter. Less attractive for long-context use cases, where "
             "that lost space is worth more."
         ),
+        "deep_dive": [
+            "Base weights are frozen and completely untouched here, which sidesteps "
+            "the selection question a different way: instead of choosing which "
+            f"existing parameters to train, prefix-tuning adds an entirely new set, "
+            f"{num_virtual_tokens} virtual key/value vectors learned for every "
+            "layer, and prepends them to that layer's real keys and values during "
+            "attention. Which layers get virtual tokens, all of them, here, is "
+            "again a design choice, not something computed from the model.",
+            "[Li & Liang, 2021](https://arxiv.org/abs/2101.00190) built this for "
+            "generation tasks, on the idea that steering a frozen model's attention "
+            "with a learned prompt can work almost as well as changing its weights. "
+            "No weights are ever touched, which makes it easy to swap between many "
+            "tasks on the same frozen model; the real cost is context window space, "
+            "since every virtual token eats a position a real token could otherwise "
+            "use. It earns its keep when many tasks need to be served off the exact "
+            "same frozen weights with nothing to merge or swap, and prompts are "
+            "short enough that losing a few tens of context positions doesn't "
+            "matter.",
+        ],
         "diagram": "prefix_tuning",
     }
