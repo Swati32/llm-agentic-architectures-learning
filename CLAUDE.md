@@ -14,6 +14,10 @@ Before writing any code, discuss and agree on:
 
 Only move to implementation once these are settled.
 
+## Flagging notable findings
+
+If a result during an experiment looks paper worthy (surprising, counter to what the grounding research would predict, or a clean enough effect to stand on its own), say so in chat as soon as you notice it. Don't just fold it quietly into the README's learnings section and move on.
+
 ## Repo structure
 
 ```
