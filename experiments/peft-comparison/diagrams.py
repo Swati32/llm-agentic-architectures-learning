@@ -45,7 +45,7 @@ def _label(x, y, text, size=11, color="#6B7280"):
 def _wrap(inner):
     return (
         f'<svg viewBox="0 0 {CANVAS_W} {CANVAS_H}" xmlns="http://www.w3.org/2000/svg" '
-        f'style="width:100%;max-width:640px;display:block;margin:0.5rem 0;">'
+        f'style="width:100%;max-width:640px;display:block;margin:0.5rem auto;">'
         '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
         'markerHeight="7" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#6B7280"/></marker></defs>'
         f"{inner}</svg>"
