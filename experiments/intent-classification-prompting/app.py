@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from metrics import confusion_pairs, operational_summary, quality_summary
+from metrics import operational_summary, quality_summary
 from taxonomy import COARSE_GROUPS
 from techniques import TECHNIQUES
 
@@ -85,6 +85,22 @@ def render_prompt_calls(prompts_used: list[list[dict]]) -> None:
     for call_index, messages in enumerate(prompts_used, start=1):
         st.caption(f"Call {call_index} of {len(prompts_used)}")
         render_messages(messages)
+
+
+def render_retrieval_note(record: pd.Series) -> None:
+    """Few-shot retrieval is the one technique where the prompt's examples
+    change per query, chosen by a mechanism worth spelling out."""
+    note = (
+        "How these examples were chosen: the query is embedded with "
+        "`sentence-transformers/all-MiniLM-L6-v2`, compared by cosine "
+        "similarity against every training example, and the 5 closest "
+        "are used as demonstrations."
+    )
+    if record["cache_hit"]:
+        note += " For this query, a near-duplicate had already been answered, so that cached prediction was reused with no fresh model call."
+    elif record["retrieval_empty"]:
+        note += " For this query, nothing in the training pool was similar enough, so it fell back to no examples at all."
+    st.caption(note)
 
 
 st.markdown(
@@ -203,44 +219,14 @@ with tab_comparison:
 
 with tab_deep_dive:
     st.subheader("All technique prompts, side by side")
-    st.caption("Same query for every technique, label catalog collapsed. Pick one below for the full deep dive.")
+    st.caption("Same query for every technique, label catalog collapsed.")
     first_query_text = records.iloc[0]["text"]
     for key, technique in TECHNIQUES.items():
         with st.expander(f"{technique.NAME}: \"{first_query_text}\""):
             example_record = records[(records["technique"] == key) & (records["text"] == first_query_text)].iloc[0]
+            if key == "few_shot_retrieval":
+                render_retrieval_note(example_record)
             render_prompt_calls(example_record["prompts_used"])
-
-    st.divider()
-
-    technique_key = st.selectbox(
-        "Technique", options=list(TECHNIQUES.keys()), format_func=lambda k: TECHNIQUES[k].NAME
-    )
-    technique_module = TECHNIQUES[technique_key]
-    technique_records = records[records["technique"] == technique_key]
-
-    st.subheader(technique_module.NAME)
-    st.markdown(technique_module.DESCRIPTION)
-
-    metric_columns = st.columns(3)
-    metric_columns[0].metric("Fine Accuracy", f"{quality.loc[technique_key, 'fine_accuracy']:.1%}")
-    metric_columns[1].metric("Macro F1", f"{quality.loc[technique_key, 'macro_f1']:.1%}")
-    metric_columns[2].metric("Mean Latency", f"{operational.loc[technique_key, 'mean_latency_seconds']:.2f}s")
-
-    st.markdown("**Example prompt** (from the first query in the test sample):")
-    render_prompt_calls(technique_records.iloc[0]["prompts_used"])
-
-    st.markdown("**Top confusions** (gold intent vs. predicted intent, most frequent mismatches):")
-    confusion = confusion_pairs(records, technique_key)
-    mismatches = confusion.copy()
-    for intent in mismatches.index:
-        if intent in mismatches.columns:
-            mismatches.loc[intent, intent] = 0
-    top_confused_intents = mismatches.sum(axis=1).sort_values(ascending=False).head(10).index
-    st.dataframe(confusion.loc[top_confused_intents])
-
-    st.markdown("**Every query, this technique's result:**")
-    display_columns = ["text", "gold_intent", "predicted_intent", "gold_group", "predicted_group", "is_valid"]
-    st.dataframe(technique_records[display_columns], width='stretch')
 
 with tab_explorer:
     query_text = st.selectbox("Query", options=sorted(records["text"].unique()))
