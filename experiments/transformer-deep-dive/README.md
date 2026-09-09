@@ -2,7 +2,7 @@
 
 A from-scratch walkthrough of the transformer architecture introduced in [Vaswani et al., 2017, Attention Is All You Need](https://arxiv.org/abs/1706.03762), aimed at someone seeing it for the first time. It traces the mechanism component by component, computes a real worked example by hand (small enough to read in a table), and then walks through how BERT, GPT, T5, and the efficiency and Mixture-of-Experts designs that followed changed the original architecture, and why each change happened. There is no dataset and no technique comparison here; unlike the other experiments in this repo, this one is a conceptual deep dive, not a side-by-side evaluation.
 
-**Live dashboard:** not yet deployed. Run it locally with `streamlit run app.py` (see Reproducing this, below).
+**[Live dashboard](https://swati-llm-architecture-and-evolution.streamlit.app/)**
 
 ## Why this paper exists
 
