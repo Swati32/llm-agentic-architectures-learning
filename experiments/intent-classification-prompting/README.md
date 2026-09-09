@@ -69,7 +69,7 @@ flowchart LR
 
 Every technique had a 0% error rate across all 1,617 calls. Label validity stayed at or above 98.7% throughout. Llama 3.1 8B followed the strict JSON instruction reliably no matter the technique.
 
-See the full results, exact prompts, and confusion matrices in the [live dashboard](https://llm-agentic-architectures-learning-8nn36axsm2lvbifxk8w4tt.streamlit.app/), or run it locally with `streamlit run app.py`.
+See the full results and exact prompts in the [live dashboard](https://llm-agentic-architectures-learning-8nn36axsm2lvbifxk8w4tt.streamlit.app/), or run it locally with `streamlit run app.py`.
 
 ## What we learned
 
