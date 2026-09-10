@@ -88,6 +88,8 @@ Each experiment README should read like a short blog post:
 - What we learned (results, surprises, caveats)
 - References to the papers/research that motivated the experiment
 - A Terminology section defining the key technical terms the experiment leans on, in plain language, with enough detail (not just a one-line definition) that a reader unfamiliar with the concepts can follow the rest of the README. Use a concrete example or analogy where it helps. Standing practice for every experiment from here on, not just ones about training internals.
+- A short "What this task does, and doesn't, test" section: which techniques the chosen dataset/task gives a genuinely fair shot, which ones it can't fairly test (and why, e.g. a technique's real advantage depends on infrastructure or a task property this dataset doesn't vary), stated plainly rather than left implied by the results alone.
+- A "Future work" section naming the natural next experiment(s) this one's limits point to. Scope any of these as their own new experiment when the time comes (see "Starting a new experiment" above), not as scope creep added onto the current one. Standing practice for every experiment from here on: capture future-experiment ideas here as they come up, not just in chat.
 
 ## README writing guidelines
 

@@ -111,6 +111,22 @@ Listing what a metric means isn't the same as knowing whether it did any work. H
 - A local 8B model run at temperature 0 with strict output-format instructions is a noisier narrator than a larger hosted model would be: some of the differences between architectures are really differences in how reliably `llama3.1:8b` follows a given prompt's format, not purely architectural. This is itself a real operational finding, not just noise to ignore (see "Model backend" below).
 - Ollama serves one model to one caller at a time on a single local GPU/CPU, so "parallel" dispatch in this experiment measures the architecture's *coordination pattern*, not the latency win a truly parallel hosted backend (with batching or multiple GPUs) would deliver.
 
+## What this task does, and doesn't, test
+
+HotpotQA was a good fit for three of the five architectures, and a poor one for two, for reasons worth being explicit about rather than leaving implied.
+
+**Good fits.** Sequential Pipeline gets tested both ways at once: comparison questions are exactly the independent, knowable-upfront shape it's built for, and bridge questions are exactly where its blind decomposition should hurt. Orchestrator (sequential dispatch) gets a generous test: bridge questions are the textbook case for adaptive re-planning, since hop 2 genuinely can't be known until hop 1 resolves. That it still lost to its own stopping problem is a stronger result for having been given a fair chance, not a weaker one. Supervisor + Verification Loop gets a good fit too: HotpotQA is extractive QA with a clear evidence-grounding structure, exactly what a dedicated "does the evidence support this" role needs. It's the one that won here.
+
+**Poor fits.** Orchestrator (parallel dispatch)'s entire value proposition is wall-clock savings from real concurrency, and that depends on the serving backend, not the task. No dataset choice can fix this: a single-slot local Ollama server structurally can't show a benefit that only exists on batched or multi-GPU serving, regardless of what questions you ask it. Single-Agent ReAct's real advantage, adapting its own step count to an unknown-in-advance task shape, never gets stressed here either, because HotpotQA's hop count is narrowly fixed at about 2 throughout. A task whose required step count actually varies would be a fairer test of that specific strength.
+
+## Future work
+
+A natural follow-up experiment, scoped as its own experiment rather than added onto this one (see "Starting a new experiment" in this repo's `CLAUDE.md`), could test:
+
+- **A task with a wide, unknown range of required steps**, not fixed at about 2 hops, to stress Single-Agent ReAct's and the adaptive orchestrator's stopping behavior harder, and to see whether adaptive stopping can actually work once the task doesn't always converge in the same couple of steps.
+- **At least one run against a hosted, batching-capable backend**, to isolate whether "the planner never stops" is a property of the model (an 8B local model specifically) or of the architecture itself, and to let Orchestrator (parallel dispatch)'s real latency case actually get measured instead of bottlenecked by a single-slot local server.
+- **A task where being wrong is more costly or harder to catch**, for example deliberately misleading or contradictory evidence, to test the Supervisor pattern's ceiling rather than just its win margin on straightforward extractive QA.
+
 ## Terminology
 
 **Agent.** A loop where a language model repeatedly decides what to do next (call a tool, ask another agent, or answer) based on what's happened so far, rather than following a fixed script. The "decides" part is what makes it an agent instead of a plain function call: the same code can take a different path on every run depending on the model's output.
