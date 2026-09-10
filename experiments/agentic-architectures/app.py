@@ -424,12 +424,19 @@ with tab_comparison:
         "only reason we know it's wrong is that the other two metric categories were tracked at all."
     )
     st.markdown(
-        "**Early termination rate was the single most decisive metric in this experiment.** It's "
-        "what turns \"Orchestrator (sequential dispatch) ties for average\" into \"Orchestrator "
-        "(sequential dispatch) never once decides it's done, in 40 out of 40 runs.\" Nothing in "
-        "the quality metrics hints at this. This is exactly what an agentic metric exists to "
-        "catch: a process that looks fine from its output and isn't, because what's keeping it "
-        "bounded is an external cap, not the architecture's own judgment."
+        "**Early termination rate was the single most decisive metric in this experiment, "
+        "because it answers a different question than accuracy does.** Exact match asks whether "
+        "the final answer was right. Early termination rate asks whether the architecture "
+        "stopped because it chose to, or because we forced it to. For Orchestrator (sequential "
+        "dispatch), those two questions have very different answers: its accuracy looks "
+        "unremarkable, tied with three other architectures at 47.5%, but in all 40 runs the "
+        "Planner never once decided on its own that it had enough information. It didn't run "
+        "out of things to search because the question needed more rounds; it ran out of rounds, "
+        "every single time, because we capped it at 3 and it never said \"DONE\" before hitting "
+        "that cap. An architecture can land on the right answer without ever demonstrating it "
+        "knew it had enough to stop, and accuracy alone can't tell those two things apart. "
+        "Practically, that means this architecture's correctness right now is partly a property "
+        "of *us* choosing 3 rounds, not of the architecture reliably knowing when to quit."
     )
     st.markdown(
         "**Empty retrieval rate explained *why* Supervisor won, not just *that* it won.** Its "
