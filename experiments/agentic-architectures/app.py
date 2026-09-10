@@ -122,6 +122,33 @@ SPOTLIGHT_EXAMPLES = [
     },
 ]
 
+# Two hand-picked runs per architecture for its own Deep-Dive tab: one where it does what
+# it's designed to do, one that shows the specific weakness its own metrics point to. Not a
+# free picker over all 40 questions, same reasoning as SPOTLIGHT_EXAMPLES above: a raw dropdown
+# doesn't tell a reader which of 40 traces is actually worth reading.
+DEEP_DIVE_TRACE_EXAMPLES = {
+    "single_agent_react": [
+        {"question_id": "5ab2958a554299449642c911", "label": "Works cleanly: two searches, then commits"},
+        {"question_id": "5abb76fa5542992ccd8e7f48", "label": "Gets stuck: keeps searching, never commits to an answer"},
+    ],
+    "sequential_pipeline": [
+        {"question_id": "5ab2958a554299449642c911", "label": "Works cleanly: both hops land on the gold paragraph"},
+        {"question_id": "5abb76fa5542992ccd8e7f48", "label": "Guesses wrong: the blind upfront decomposition misses"},
+    ],
+    "orchestrator_sequential": [
+        {"question_id": "5adbf84555429947ff17387c", "label": "Gets the right answer, but keeps going after it already had enough"},
+        {"question_id": "5abcd77755429965836004ce", "label": "Adaptive re-planning still lands on the wrong answer"},
+    ],
+    "orchestrator_parallel": [
+        {"question_id": "5ab2958a554299449642c911", "label": "Works cleanly: identical to the fixed pipeline's answer"},
+        {"question_id": "5abb76fa5542992ccd8e7f48", "label": "Guesses wrong: same blind decomposition, same miss"},
+    ],
+    "supervisor_verification": [
+        {"question_id": "5adcd6705542992c1e3a2426", "label": "Verification loop working: first draft rejected, second draft accepted"},
+        {"question_id": "5ae0120155429925eb1afbfb", "label": "Stuck: 3 rounds of refinement, never finds evidence to verify"},
+    ],
+}
+
 st.set_page_config(page_title="Agentic Architectures Compared", layout="wide")
 
 
@@ -137,6 +164,14 @@ def combined_metrics(records: pd.DataFrame) -> pd.DataFrame:
 
 def format_metric(metric: str, value: float) -> str:
     return METRIC_FORMATS.get(metric, "{:.2f}").format(value)
+
+
+def format_predicted(value) -> str:
+    # A run that never committed to an answer (early terminated with no
+    # finish/verdict) stores None, which pandas turns into float NaN once
+    # it's in a DataFrame column, and "nan" reads like a bug rather than
+    # the actual outcome.
+    return "(no answer)" if pd.isna(value) else str(value)
 
 
 def ranked_metrics(combined: pd.DataFrame, architecture_key: str) -> list[tuple[str, float, int, int]]:
@@ -563,13 +598,14 @@ with tab_deep_dive:
         with st.expander(f"{role}"):
             st.text(prompt)
 
-    st.markdown("#### Example run, full trace")
+    st.markdown("#### Example runs")
+    st.caption("One question this architecture handles the way it's meant to, and one that shows its characteristic weakness.")
     architecture_records = records[records["architecture"] == architecture_key]
-    question_options = architecture_records["question"].tolist()
-    example_question = st.selectbox("Question", options=question_options, key=f"trace_{architecture_key}")
-    example_run = architecture_records[architecture_records["question"] == example_question].iloc[0]
-    st.markdown(f"**Gold answer:** `{example_run['gold_answer']}` · **Predicted:** `{example_run['predicted_answer']}` · **F1:** {example_run['f1']:.2f}")
-    render_trace(example_run["steps"])
+    for example in DEEP_DIVE_TRACE_EXAMPLES[architecture_key]:
+        example_run = architecture_records[architecture_records["question_id"] == example["question_id"]].iloc[0]
+        with st.expander(f"{example['label']}: “{example_run['question']}”"):
+            st.markdown(f"**Gold answer:** `{example_run['gold_answer']}` · **Predicted:** `{format_predicted(example_run['predicted_answer'])}` · **F1:** {example_run['f1']:.2f}")
+            render_trace(example_run["steps"])
 
 with tab_explorer:
     st.header("Spotlight examples")
@@ -592,7 +628,7 @@ with tab_explorer:
 
             display_summary = pd.DataFrame(
                 {
-                    "Predicted": question_records["predicted_answer"],
+                    "Predicted": question_records["predicted_answer"].map(format_predicted),
                     "Correct": question_records["exact_match"].map({1.0: "✅", 0.0: "❌"}),
                     "Early terminated": question_records["early_terminated"].map({True: "yes", False: ""}),
                 }
