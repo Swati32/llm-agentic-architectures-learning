@@ -57,6 +57,71 @@ LOWER_IS_BETTER = {
     "empty_retrieval_rate", "error_rate",
 }
 
+# Hand-picked from the actual results (see the Comparison tab's "Analysis" section for how
+# these were found), not a representative sample: each one exists to make one specific finding
+# concrete, in the architectures' own traces, rather than asking a reader to browse all 40
+# questions to rediscover it themselves.
+SPOTLIGHT_EXAMPLES = [
+    {
+        "question_id": "5adbf84555429947ff17387c",
+        "title": "The planner never says it's done",
+        "why": (
+            "A clean 2-hop comparison question: the Planner had already answered both "
+            "sub-questions it needed by round 2, then invented an unnecessary third question "
+            "anyway rather than stopping. See the Comparison tab's first finding."
+        ),
+        "trace_architectures": ["orchestrator_sequential"],
+    },
+    {
+        "question_id": "5abcd77755429965836004ce",
+        "title": "Single-Agent ReAct gets stuck; the \"smarter\" adaptive orchestrator gets it wrong",
+        "why": (
+            "Single-Agent ReAct never commits to an answer and burns its whole turn budget "
+            "searching instead. The adaptive Orchestrator does commit, but to the wrong answer. "
+            "The fixed pipeline, which does no adapting at all, gets it right. See the "
+            "Comparison tab's findings on Single-Agent ReAct's stopping problem and on fixed vs. "
+            "adaptive decomposition."
+        ),
+        "trace_architectures": ["single_agent_react", "orchestrator_sequential", "sequential_pipeline"],
+    },
+    {
+        "question_id": "5ae0120155429925eb1afbfb",
+        "title": "No clean win: the fixed pipeline guesses wrong here, and adaptive planning doesn't reliably fix it either",
+        "why": (
+            "The fixed pipeline's blind upfront guess is wrong. The adaptive orchestrator "
+            "reaches the right answer, but only after also exhausting its round budget without "
+            "ever saying it was done. The verification loop gets stuck for the opposite reason: "
+            "it never finds evidence to verify its draft against, in any of its 3 rounds. See "
+            "the Comparison tab's findings on the verification loop's limits and on fixed vs. "
+            "adaptive decomposition."
+        ),
+        "trace_architectures": ["sequential_pipeline", "orchestrator_sequential", "supervisor_verification"],
+    },
+    {
+        "question_id": "5ae1847e55429920d52343ee",
+        "title": "Verification catches a subtler failure than a wrong fact: answering the wrong question",
+        "why": (
+            "Four architectures correctly retrieve Liuzhou's area, then answer with that number "
+            "instead of actually naming which city is bigger. Only the Supervisor's Verifier "
+            "role catches that the draft doesn't actually answer the question asked. See the "
+            "Comparison tab's \"Retrieval quality only improved where a role was actually built "
+            "to improve it.\""
+        ),
+        "trace_architectures": ["sequential_pipeline", "supervisor_verification"],
+    },
+    {
+        "question_id": "5ab9fe1255429939ce03dc40",
+        "title": "Some bridge questions beat every architecture",
+        "why": (
+            "All five architectures give a different, wrong answer here. No amount of "
+            "coordination structure fixes a reasoning chain the model gets wrong in the first "
+            "place. See the Comparison tab's \"Comparison questions were easier than bridge "
+            "questions for every architecture, not just some.\""
+        ),
+        "trace_architectures": ["single_agent_react", "supervisor_verification"],
+    },
+]
+
 st.set_page_config(page_title="Agentic Architectures Compared", layout="wide")
 
 
@@ -507,20 +572,33 @@ with tab_deep_dive:
     render_trace(example_run["steps"])
 
 with tab_explorer:
-    question_text = st.selectbox("Question", options=sorted(records["question"].unique()))
-    question_records = records[records["question"] == question_text].set_index("architecture")
-
-    gold_answer = question_records.iloc[0]["gold_answer"]
-    question_type = question_records.iloc[0]["question_type"]
-    st.markdown(f"**Gold answer:** `{gold_answer}` · **Type:** `{question_type}`")
-
-    summary_columns = ["predicted_answer", "exact_match", "f1", "step_count", "tool_calls", "handoffs", "wall_clock_seconds"]
-    display_summary = question_records[summary_columns].rename(index=lambda k: architectures_meta[k]["name"])
-    st.dataframe(display_summary, width="stretch")
-
-    architecture_key = st.selectbox(
-        "Inspect one architecture's full trace for this question",
-        options=list(ARCHITECTURES.keys()),
-        format_func=lambda k: architectures_meta[k]["name"],
+    st.header("Spotlight examples")
+    st.caption(
+        "Not a browser over all 40 questions: these are the specific examples that most clearly "
+        "show *why* the architectures behaved differently, each tied to a finding from the "
+        "Architecture Comparison tab. Open one to see the actual traces behind the claim."
     )
-    render_trace(question_records.loc[architecture_key, "steps"])
+
+    for spotlight in SPOTLIGHT_EXAMPLES:
+        question_records = records[records["question_id"] == spotlight["question_id"]].set_index("architecture")
+        gold_answer = question_records.iloc[0]["gold_answer"]
+        question_type = question_records.iloc[0]["question_type"]
+        question_text = question_records.iloc[0]["question"]
+
+        with st.expander(spotlight["title"]):
+            st.markdown(spotlight["why"])
+            st.markdown(f"**Question:** {question_text}")
+            st.markdown(f"**Gold answer:** `{gold_answer}` · **Type:** `{question_type}`")
+
+            display_summary = pd.DataFrame(
+                {
+                    "Predicted": question_records["predicted_answer"],
+                    "Correct": question_records["exact_match"].map({1.0: "✅", 0.0: "❌"}),
+                    "Early terminated": question_records["early_terminated"].map({True: "yes", False: ""}),
+                }
+            ).rename(index=lambda k: architectures_meta[k]["name"])
+            st.dataframe(display_summary, width="stretch")
+
+            for architecture_key in spotlight["trace_architectures"]:
+                st.markdown(f"**{architectures_meta[architecture_key]['name']}, full trace:**")
+                render_trace(question_records.loc[architecture_key, "steps"])
