@@ -2,6 +2,8 @@
 
 This experiment compares five ways to structure a multi-step agent that answers a question requiring two separate lookups. It also measures what each structure costs to run: how many steps it takes, how often it hands control between roles, and how often it runs out of budget without a clean answer.
 
+**[Live dashboard](https://swati-agentic-architectures.streamlit.app/)**
+
 **In short:** the Supervisor + Verification Loop won on accuracy (60% exact match, versus 47.5% for the other four, which all tied). But the two "smarter" adaptive designs each had a specific failure mode worth knowing before you reach for them: the adaptive orchestrator's planner never once decided it had enough information on its own, in all 40 runs, so its step cap did 100% of the "when to stop" work. The single agent had the same problem in a different costume: it answered correctly 73% of the time it actually committed to an answer, but committed only 65% of the time, burning its whole budget re-searching instead. And running two lookups in parallel instead of one after another produced byte-for-byte identical answers and barely any wall-clock speedup, because the local model server serializes requests internally regardless of how many threads call it.
 
 ## Setup
@@ -73,7 +75,7 @@ Semantic cache hit rate isn't tracked: nothing in this experiment caches across 
 
 Every architecture had a 0% model-call error rate across all calls, so none of the gap above comes from outright failures, only from what each architecture chose to do.
 
-See the full results, every prompt, and a step-by-step trace of any question through any architecture in the dashboard: `streamlit run app.py`.
+See the full results, every prompt, and a step-by-step trace of any question through any architecture in the [live dashboard](https://swati-agentic-architectures.streamlit.app/), or run it locally with `streamlit run app.py`.
 
 ## Why these metrics, and which ones actually mattered
 
