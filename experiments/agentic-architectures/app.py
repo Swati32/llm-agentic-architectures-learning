@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from metrics import agentic_summary, operational_summary, quality_summary
 from techniques import ARCHITECTURES
@@ -110,6 +111,37 @@ def notable_metrics(combined: pd.DataFrame, architecture_key: str, side: str, co
     return picks[:count]
 
 
+def render_mermaid(diagram: str, height: int = 220) -> None:
+    # The first time a tab is switched into, its newly-mounted iframe can
+    # briefly have zero layout width while Streamlit is still sizing the
+    # panel around it. mermaid's default `startOnLoad` renders immediately
+    # on script load and measures labels against whatever width exists at
+    # that instant, so a render that races the layout collapses to a tiny,
+    # illegible diagram (this is reproducible: switching to a different
+    # architecture afterwards, once the panel is already sized, renders
+    # correctly first try). Disabling startOnLoad and polling for a real
+    # width before calling mermaid.run() avoids racing that layout pass.
+    components.html(
+        f"""
+        <div class="mermaid" id="diagram" style="font-family: sans-serif;">{diagram}</div>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+        <script>
+            mermaid.initialize({{ startOnLoad: false, flowchart: {{ useMaxWidth: true }} }});
+            function renderWhenReady(attemptsLeft) {{
+                var el = document.getElementById("diagram");
+                if (el.offsetWidth > 0 || attemptsLeft <= 0) {{
+                    mermaid.run({{ nodes: [el] }});
+                }} else {{
+                    requestAnimationFrame(function () {{ renderWhenReady(attemptsLeft - 1); }});
+                }}
+            }}
+            renderWhenReady(60);
+        </script>
+        """,
+        height=height,
+    )
+
+
 def render_trace(steps: list[dict]) -> None:
     for i, step in enumerate(steps, start=1):
         if step["kind"] == "tool_call":
@@ -138,18 +170,6 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True,
-)
-
-st.markdown(
-    "**In short:** the Supervisor + Verification Loop won on accuracy (60% exact match, versus "
-    "47.5% for the other four, which all tied), by rescuing bad retrievals through query "
-    "refinement, not by chaining bridge-question hops. The adaptive orchestrator's planner never "
-    "once decided on its own that it had enough information, in all 40 runs, so its step cap did "
-    "100% of the work of stopping it. Single-Agent ReAct had the same problem in a different "
-    "shape: it was right 73% of the time it actually committed to an answer, but committed only "
-    "65% of the time. And running two lookups in parallel produced byte-for-byte identical "
-    "answers to running them one after another, with barely any wall-clock speedup, because the "
-    "local model server serializes requests no matter how many threads call it."
 )
 
 if not RESULTS_PATH.exists():
@@ -231,12 +251,17 @@ with tab_methodology:
     )
 
 with tab_comparison:
-    st.header("What worked, what didn't")
+    quality = quality_summary(records)
+    agentic = agentic_summary(records)
+    operational = operational_summary(records)
+
+    st.header("Quick reference: strongest and weakest metric")
     st.caption(
         "For each architecture, its top 2 metrics that actually distinguish it from the other "
-        "four (What worked) and its bottom 2 (Struggled). A metric every architecture is tied "
+        "four (Worked well) and its bottom 2 (Struggled). A metric every architecture is tied "
         "on, e.g. a 0% error rate across the board, is excluded: it isn't a distinguishing "
-        "strength or weakness for any one of them."
+        "strength or weakness for any one of them. This table is a starting point for orientation, "
+        "not the comparison. The full analysis, with the mechanism behind each result, is below."
     )
 
     def describe_side(key: str, side: str) -> tuple[str, str]:
@@ -255,28 +280,181 @@ with tab_comparison:
         )
     st.dataframe(pd.DataFrame(overview_rows).set_index("Architecture"), width="stretch")
 
-    st.header("Quality: all architectures")
-    quality = quality_summary(records)
+    st.header("Analysis: what happened, and why")
+
+    st.markdown("#### The adaptive planner never once decided it had enough information")
+    st.markdown(
+        "Orchestrator (sequential dispatch)'s early termination rate is **100%**: every one of "
+        "the 40 runs used its full 3-round budget rather than the Planner ever emitting "
+        "`Next: DONE`. Looking at actual planner output shows why concretely: for \"Are both "
+        "Adolfo Bioy Casares and James Norman Hall Argentinian authors?\", a clean 2-hop "
+        "comparison question, the Planner asked for Bioy Casares' nationality, then Hall's "
+        "nationality (both answered after 2 rounds), then invented a third question anyway: "
+        "\"What is the nationality of the co-author of James Norman Hall's novel "
+        "'Mutiny on the Bounty'?\" It never judged that it was done; the step cap was the only "
+        "thing that ever stopped it. This isn't a new discovery: it's the same problem "
+        "ReAct-style agents were already known to have when a stopping condition depends on the "
+        "model itself recognizing it has enough "
+        "([Yao et al., 2022](https://arxiv.org/abs/2210.03629)). What this experiment adds is "
+        "that it shows up in a dedicated Planner role too, not just a single agent's own loop, "
+        "which is the next finding."
+    )
+
+    st.markdown("#### Single-Agent ReAct hit the identical failure in a different shape")
+    st.markdown(
+        "Single-Agent ReAct never emitted `Action: finish[...]` on **35%** of runs (14 of 40), "
+        "instead looping on `search[...]` until it hit its 4-turn cap. But on the 26 runs where "
+        "it did commit to an answer, it was right **73%** of the time (19 of 26). The model's "
+        "reasoning wasn't the bottleneck here; deciding it had looked hard enough was. Put "
+        "next to the previous finding, the same root cause shows up in two structurally "
+        "different architectures: a single agent freely deciding whether to act again, and an "
+        "orchestrator's dedicated Planner role deciding whether to delegate again. Both "
+        "defaulted to \"look for more\" over \"commit to an answer\", which points at this being "
+        "a property of the model's disposition toward the search-versus-finish decision itself, "
+        "not of either control-flow structure."
+    )
+
+    st.markdown("#### The verification loop won on accuracy by rescuing bad retrievals, not by chaining hops")
+    st.markdown(
+        "Supervisor + Verification Loop reached **60%** exact match, 12.5 points above every "
+        "other architecture, and its F1 lead is almost entirely on comparison questions "
+        "(**0.836**, versus 0.561-0.676 elsewhere). Its lead evaporates on bridge questions, "
+        "where its 0.410 F1 is statistically indistinguishable from the rest (0.389-0.435 on 20 "
+        "questions). The round-count distribution shows the mechanism: 19 of 40 runs had their "
+        "first draft accepted immediately, 19 of 40 exhausted all 3 rounds without ever getting "
+        "the Verifier's approval, and only 2 landed in between. That bimodal split says query "
+        "refinement works when the *first* retrieval was merely mediocre, giving the Supervisor "
+        "room to phrase a better query against the same fixed corpus, but doesn't help when the "
+        "corpus genuinely lacks better evidence for that phrasing, or when the missing piece is "
+        "a second hop the loop was never designed to chase. This matches a broader finding that "
+        "self-correction without new external information tends to plateau or thrash rather "
+        "than converge ([Huang et al., 2023](https://arxiv.org/abs/2310.01798)): the Verifier "
+        "can reject a bad draft, but \"try a different search query\" isn't new information "
+        "when the same 10 paragraphs are all that exist."
+    )
+
+    st.markdown("#### Parallel dispatch bought almost nothing, and the reason is the serving backend")
+    st.markdown(
+        "Orchestrator (parallel dispatch) and Sequential Pipeline (fixed) share the exact same "
+        "upfront decomposition and produced **byte-for-byte identical predicted answers** on "
+        "every one of the 40 questions (both 47.5% exact match, both 0.527 F1, identical bridge "
+        "and comparison splits). That's expected at temperature 0: dispatch order doesn't "
+        "change what either hop retrieves or what the model outputs, only when it happens. The "
+        "wall-clock gap is more informative: 5.1s parallel versus 5.7s sequential, about 10%, "
+        "far short of the roughly 2x a truly concurrent backend should give two independent "
+        "lookups. Ollama was running with a single parallel processing slot, so concurrent "
+        "requests from the two worker threads were still served one at a time. The lesson "
+        "generalizes: parallel dispatch is a property of your architecture's *intent*, but the "
+        "latency win only shows up if your serving layer (batching, multiple GPUs, multiple "
+        "hosted replicas) actually honors that intent."
+    )
+
+    st.markdown("#### Fixed decomposition guessed at bridge hops it couldn't have known, and adaptive planning didn't clearly fix it")
+    st.markdown(
+        "The original hypothesis was that Sequential Pipeline's blind, upfront decomposition "
+        "would specifically hurt bridge questions, where hop 2 needs an entity hop 1 hasn't "
+        "found yet, and that Orchestrator (sequential dispatch)'s adaptive re-planning would "
+        "recover that gap. The data doesn't support a clean win: bridge F1 was **0.435** for "
+        "the fixed pipeline versus **0.389** for the adaptive orchestrator, a difference well "
+        "inside the noise of a 20-question sample, not the clear recovery the hypothesis "
+        "predicted. Spot-checking individual traces shows why the adaptive version doesn't "
+        "cleanly help even when it could: per the first finding above, its Planner keeps "
+        "generating additional sub-questions past the point where it already had the bridge "
+        "entity, and that extra, sometimes off-target searching dilutes the evidence handed to "
+        "the Synthesizer as often as it sharpens it. Adaptive planning only pays for itself if "
+        "the planner also knows when to stop adapting."
+    )
+
+    st.markdown("#### State overhead was Single-Agent ReAct's real cost, hidden inside \"just one agent\"")
+    st.markdown(
+        "Single-Agent ReAct carried a mean state overhead of **2,855 bytes** (its entire "
+        "running transcript), 4 to 10 times every multi-agent architecture (292-762 bytes), "
+        "because a multi-agent handoff only carries forward a small structured summary (a "
+        "sub-question and its answer), while a single agent's context is its whole history, "
+        "verbatim. That's also why it had the highest mean prompt tokens (1,317) and highest "
+        "latency (10.9s) despite doing the least explicit coordination (0 handoffs, by "
+        "construction): \"no coordination overhead\" doesn't mean \"no overhead\", it means the "
+        "overhead moved into the transcript instead of into handoff messages."
+    )
+
+    st.subheader("Other observations")
+
+    st.markdown("**Comparison questions were easier than bridge questions for every architecture, not just some.**")
+    st.markdown(
+        "Bridge F1 clusters tightly and low across all five architectures (0.389-0.435), while "
+        "comparison F1 is both higher and more spread out (0.561-0.836). That gap holds "
+        "regardless of architecture, which points at something structural about the task, not "
+        "a specific control-flow weakness. A comparison question's two sub-lookups are usually "
+        "self-contained (\"how tall is A\", \"how tall is B\"), so retrieval accuracy alone gets "
+        "you most of the way. A bridge question needs the model to correctly name an "
+        "intermediate entity, in natural language, before the second query can even be formed, "
+        "an extra inferential step that fails independently of how good the retrieval is. The "
+        "original HotpotQA paper draws exactly this distinction between the two question types "
+        "([Yang et al., 2018](https://arxiv.org/abs/1809.09600))."
+    )
+
+    st.markdown("**More handoffs didn't mean better coordination.**")
+    st.markdown(
+        "Orchestrator (sequential dispatch) and Supervisor + Verification Loop both average 7 "
+        "handoffs, the joint-highest of all five architectures, yet one is tied for the lowest "
+        "accuracy (47.5%) and the other is the highest (60%). The amount of coordination on the "
+        "agentic-metrics dashboard doesn't predict quality by itself; what those handoffs are "
+        "*for* does. The orchestrator's handoffs are spent gathering more sub-questions, "
+        "including unnecessary ones (see above). The supervisor's are spent checking and "
+        "re-trying evidence. Same cost by this metric, different payoff."
+    )
+
+    st.markdown("**Token spend didn't track with accuracy either.**")
+    st.markdown(
+        "Orchestrator (sequential dispatch) spent the second-most prompt tokens per question "
+        "(1,196), behind only Single-Agent ReAct (1,317), yet tied for the lowest exact match "
+        "(47.5%) with two architectures that spent almost half as many tokens (643, both the "
+        "fixed pipeline and the parallel dispatch). Supervisor, the accuracy winner, spent a "
+        "moderate 788, less than both lower-accuracy, higher-token architectures. Spending more "
+        "tokens on an architecture that keeps re-asking questions the model didn't actually "
+        "need doesn't buy accuracy. Spending a bit more on a role whose entire job is checking "
+        "whether an answer is trustworthy does."
+    )
+
+    st.markdown("**Retrieval quality only improved where a role was actually built to improve it.**")
+    st.markdown(
+        "Empty retrieval rate, the fraction of searches that miss both gold paragraphs, sits in "
+        "a narrow band for four architectures (17.5-19.8%) and drops meaningfully only for "
+        "Supervisor (9.6%), the one architecture whose queries can be revised based on explicit "
+        "feedback about what evidence was missing. None of the other four ever rewrites a query "
+        "after seeing it fail; Supervisor is the only one built to. That's a real, measurable "
+        "benefit of the verification loop, distinct from (and smaller than) its overall "
+        "accuracy win, and it's the mechanism behind why the accuracy win happens at all."
+    )
+
+    st.header("Supporting data")
+
+    st.subheader("Quality: all architectures")
     st.dataframe(quality.rename(columns=METRIC_LABELS).style.format("{:.1%}"), width="stretch")
     st.bar_chart(quality[["exact_match", "f1", "bridge_f1", "comparison_f1"]])
 
-    st.header("Agentic cost: all architectures")
-    agentic = agentic_summary(records)
+    st.subheader("Agentic cost: all architectures")
     agentic_formats = {METRIC_LABELS[c]: METRIC_FORMATS.get(c, "{:.2f}") for c in agentic.columns}
     st.dataframe(agentic.rename(columns=METRIC_LABELS).style.format(agentic_formats), width="stretch")
     st.bar_chart(agentic[["mean_step_count", "mean_handoffs"]])
     st.bar_chart(agentic[["early_termination_rate", "tool_error_rate"]])
 
-    st.header("Operational cost: all architectures")
-    operational = operational_summary(records)
+    st.subheader("Operational cost: all architectures")
     operational_formats = {METRIC_LABELS[c]: METRIC_FORMATS.get(c, "{:.2f}") for c in operational.columns}
     st.dataframe(operational.rename(columns=METRIC_LABELS).style.format(operational_formats), width="stretch")
     st.bar_chart(operational[["mean_latency_seconds"]])
     st.bar_chart(operational[["mean_prompt_tokens", "mean_completion_tokens"]])
 
-    st.header("Accuracy vs. wall-clock time")
+    st.subheader("Accuracy vs. wall-clock time")
     tradeoff = quality[["exact_match"]].join(agentic[["mean_wall_clock_seconds"]])
     st.scatter_chart(tradeoff, x="mean_wall_clock_seconds", y="exact_match")
+
+    st.caption(
+        "40 questions is enough to see clear directional differences, not enough for tight "
+        "statistical confidence on the exact percentage-point gaps. Treat any single-digit "
+        "difference between architectures as noise; the findings above are stated at the "
+        "confidence the underlying traces actually support."
+    )
 
 with tab_deep_dive:
     architecture_key = st.selectbox(
@@ -284,21 +462,43 @@ with tab_deep_dive:
     )
     meta = architectures_meta[architecture_key]
     st.subheader(meta["name"])
-    st.markdown(meta["description"])
 
-    st.markdown("**How it ranks against the other four architectures, best to worst:**")
+    st.markdown("#### What it is")
+    st.markdown(meta["what_it_is"])
+
+    # Measured from each diagram's actual rendered viewBox height, plus
+    # margin, rather than guessed: flowchart height depends on how many
+    # parallel lanes mermaid lays a diagram's branches into, not on how
+    # many nodes or loops it has, so a per-architecture value beats one
+    # constant for every diagram.
+    diagram_heights = {
+        "single_agent_react": 280,
+        "sequential_pipeline": 110,
+        "orchestrator_sequential": 210,
+        "orchestrator_parallel": 200,
+        "supervisor_verification": 200,
+    }
+    render_mermaid(meta["diagram"], height=diagram_heights[architecture_key])
+
+    st.markdown("#### How we implemented it")
+    st.markdown(meta["how_we_implemented_it"])
+
+    st.markdown("#### When it's useful")
+    st.markdown(meta["when_its_useful"])
+
+    st.markdown("#### How it ranks against the other four architectures, best to worst")
     ranked = ranked_metrics(combined, architecture_key)
     ranked_table = pd.DataFrame(
         [{"Metric": METRIC_LABELS[m], "Value": format_metric(m, v), "Rank": f"{r} of {n}"} for m, v, r, n in ranked]
     )
     st.dataframe(ranked_table.set_index("Metric"), width="stretch")
 
-    st.markdown("**Prompts used, verbatim:**")
+    st.markdown("#### Prompts used, verbatim")
     for role, prompt in meta["prompts"].items():
         with st.expander(f"{role}"):
             st.text(prompt)
 
-    st.markdown("**Example run, full trace:**")
+    st.markdown("#### Example run, full trace")
     architecture_records = records[records["architecture"] == architecture_key]
     question_options = architecture_records["question"].tolist()
     example_question = st.selectbox("Question", options=question_options, key=f"trace_{architecture_key}")

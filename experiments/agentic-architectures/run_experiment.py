@@ -62,7 +62,15 @@ def main() -> None:
     corpora = {example["id"]: build_corpus(example) for example in sample}
 
     architectures_metadata = {
-        key: {"name": module.NAME, "description": module.DESCRIPTION, "prompts": module.PROMPTS}
+        key: {
+            "name": module.NAME,
+            "description": module.DESCRIPTION,
+            "prompts": module.PROMPTS,
+            "what_it_is": module.WHAT_IT_IS,
+            "how_we_implemented_it": module.HOW_WE_IMPLEMENTED_IT,
+            "when_its_useful": module.WHEN_ITS_USEFUL,
+            "diagram": module.DIAGRAM,
+        }
         for key, module in ARCHITECTURES.items()
     }
 

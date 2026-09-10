@@ -39,6 +39,46 @@ PROMPTS = {
     "synthesizer": SYNTHESIZER_SYSTEM_PROMPT,
 }
 
+WHAT_IT_IS = (
+    "The same orchestrator-workers pattern as the sequential-dispatch version, but with a "
+    "different dispatch policy: instead of running Workers one at a time and letting each one "
+    "see the last one's result, all the Workers are launched together and the Orchestrator "
+    "waits for all of them before moving on. This is the fan-out/fan-in shape: one decision "
+    "upstream spawns several independent branches of work, and a downstream step reassembles "
+    "them. It trades the *possibility* of one Worker informing another for the *possibility* of "
+    "finishing faster, and it only delivers the second part if whatever is actually serving the "
+    "model can run those Workers' calls concurrently rather than queueing them."
+)
+HOW_WE_IMPLEMENTED_IT = (
+    "Identical decomposition step to the fixed Sequential Pipeline: one Decomposer call produces "
+    "2 sub-questions upfront. Then both are dispatched at once with Python's `ThreadPoolExecutor`, "
+    "each running its own `search()` and Reader call in its own thread, and we wait for both "
+    "before continuing. Results are collected back in the original order regardless of which "
+    "thread finished first, then handed to the same Synthesizer used elsewhere. Handoffs count "
+    "as 4 (Decomposer to each of 2 Workers, each Worker back to the Synthesizer), one more than "
+    "the fixed pipeline's 3, because a fan-out/fan-in shape has more edges than a straight chain "
+    "even though it does the same amount of work. The wall-clock benefit is only real if the "
+    "backend serving the model actually processes concurrent requests in parallel."
+)
+WHEN_ITS_USEFUL = (
+    "Use this when your sub-tasks are genuinely independent (nothing downstream needs to see "
+    "another sub-task's result before it can run) and your serving infrastructure can actually "
+    "run concurrent model calls, batched GPU serving, multiple replicas behind a load balancer, "
+    "or a hosted API with real concurrency. In that setting it buys you latency for free: same "
+    "answers, same cost, less wall-clock time. It buys you nothing, and can quietly produce "
+    "wrong answers, when a later sub-task actually depends on an earlier one's result: a worker "
+    "running concurrently structurally cannot see another worker's output, so a genuinely "
+    "chained question can never be answered correctly this way, no matter how good the model is."
+)
+DIAGRAM = """flowchart LR
+    Q["Question"] --> D["Decomposer<br/>writes 2 sub-questions"]
+    D --> W1["Worker 1<br/>search + read"]
+    D --> W2["Worker 2<br/>search + read"]
+    W1 --> S["Synthesizer"]
+    W2 --> S
+    S --> Ans["Predicted answer"]
+"""
+
 
 def _run_worker(worker_index: int, sub_question: str, corpus) -> tuple[list[Step], str | None]:
     worker_steps = []

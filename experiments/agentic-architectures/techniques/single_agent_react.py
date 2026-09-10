@@ -40,6 +40,52 @@ SYSTEM_PROMPT = (
 )
 PROMPTS = {"agent": SYSTEM_PROMPT}
 
+WHAT_IT_IS = (
+    "ReAct (Reasoning + Acting) puts reasoning and tool use in one running transcript, produced "
+    "by one model, one call at a time. Each turn the model writes a short 'Thought' (why it's "
+    "doing what it's about to do) and then an 'Action' (a tool call, or an answer). Whatever the "
+    "tool returns gets appended as an 'Observation', and the whole thing feeds back into the next "
+    "turn's prompt. There's no separate planner, no separate worker: the same model that reasons "
+    "about the problem is the same model that decides which tool to call and when to stop. "
+    "The name comes from [Yao et al., 2022](https://arxiv.org/abs/2210.03629), who showed that "
+    "interleaving reasoning traces with actions, rather than reasoning first and acting after "
+    "or acting without reasoning at all, reduced hallucinated intermediate steps and made it "
+    "easier to recover from a bad tool result, because the model's own reasoning about a "
+    "surprising observation is visible in the transcript."
+)
+HOW_WE_IMPLEMENTED_IT = (
+    "One system prompt (shown below) describes the `search[query]` and `finish[answer]` actions "
+    "and the exact line format expected. `run()` keeps a single `messages` list: the system "
+    "prompt, the question, and then one assistant message and one observation message appended "
+    "per turn. Each turn we call the model once, regex-parse its `Action:` line, and branch: "
+    "`finish[...]` sets the predicted answer and ends the run; `search[...]` calls the shared "
+    "`search()` tool and appends its result as an `Observation:` message before looping again. "
+    "There's a hard cap of 4 turns (`MAX_TURNS`): if the model never emits `finish[...]` by then, "
+    "the run ends with no answer, flagged `early_terminated`. Because there's only one role, "
+    "`handoffs` is 0 by construction, and the run's state overhead is the entire `messages` list "
+    "serialized, not a small structured summary the way the multi-agent architectures pass "
+    "between roles."
+)
+WHEN_ITS_USEFUL = (
+    "Reach for this when you don't know the shape of the task ahead of time and want the model "
+    "to decide, turn by turn, how much work it needs to do; when you have a small number of "
+    "tools and don't want the engineering cost of coordinating separate roles; or when you're "
+    "prototyping and want the fastest thing to build, since it's one prompt and one loop, easiest "
+    "to debug because there's only one transcript to read top to bottom. It's a weaker fit once "
+    "the task has a genuinely fixed shape (then a pipeline is more predictable and cheaper), or "
+    "once correctness matters enough to want a second, independent role checking the first role's "
+    "work (then look at the Supervisor pattern): a single agent never gets a second opinion on "
+    "its own reasoning, and as our results show, deciding when to stop is exactly where it "
+    "struggled."
+)
+DIAGRAM = """flowchart LR
+    Q["Question"] --> A["Agent<br/>Thought + Action"]
+    A -->|"search[query]"| T["search() tool"]
+    T -->|"Observation"| A
+    A -->|"finish[answer]"| Ans["Predicted answer"]
+    A -.->|"turn 4 cap, no finish"| None["No answer<br/>(early terminated)"]
+"""
+
 FINISH_ACTION_RE = re.compile(r"Action:\s*finish\[(.+?)\]", re.IGNORECASE | re.DOTALL)
 SEARCH_ACTION_RE = re.compile(r"Action:\s*search\[(.+?)\]", re.IGNORECASE | re.DOTALL)
 

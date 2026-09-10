@@ -55,6 +55,52 @@ PROMPTS = {
     "supervisor (query refinement)": SUPERVISOR_REFINE_PROMPT,
 }
 
+WHAT_IT_IS = (
+    "A hierarchical pattern with specialist roles instead of interchangeable workers, plus a "
+    "self-correction loop. The Supervisor doesn't do the retrieving, drafting, or checking "
+    "itself, it routes between three roles that each do one job: a Retriever fetches evidence, "
+    "a Reasoner drafts an answer from it, and a Verifier, a separate role with no stake in the "
+    "draft being right, checks whether the evidence actually supports it. A rejected draft "
+    "sends control back to the Supervisor to try a different search, rather than accepting the "
+    "first thing the Reasoner produced. This is the reflection/self-critique idea from "
+    "[Reflexion](https://arxiv.org/abs/2303.11366) and "
+    "[Self-Refine](https://arxiv.org/abs/2303.17651), applied with a dedicated role for the "
+    "critique step rather than asking one model to critique its own answer in the same breath "
+    "it produced it."
+)
+HOW_WE_IMPLEMENTED_IT = (
+    "A loop bounded to 3 rounds. Round 1 searches the original question; the Reasoner drafts an "
+    "answer and quotes the evidence sentence it's relying on; the Verifier checks that quote "
+    "against the draft and responds `SUPPORTED` or `NOT_SUPPORTED[reason]`. If supported, that "
+    "draft becomes the final answer immediately. If not, a Supervisor call is shown the "
+    "Verifier's stated reason and writes an improved search query for the next round. Every "
+    "round costs 3 handoffs (Supervisor to Retriever, Retriever to Reasoner, Reasoner to "
+    "Verifier), plus one more (Verifier back to Supervisor) if it loops again, so a run that "
+    "needs all 3 rounds costs more handoffs than any other architecture here. If round 3 still "
+    "isn't verified, we take that round's draft anyway and flag the run `early_terminated`."
+)
+WHEN_ITS_USEFUL = (
+    "Reach for this when a wrong answer is more costly than a slow one, and especially when the "
+    "way an answer can be wrong is 'sounds plausible but isn't actually backed by the evidence', "
+    "exactly the failure mode a dedicated Verifier role is positioned to catch, since it never "
+    "sees the Reasoner's confidence, only the quoted evidence. It costs more rounds and more "
+    "tokens than a single pass, and our results show its real limit clearly: the refinement "
+    "step only helps when a better search query exists for the Retriever to find. If the "
+    "underlying tool has no better evidence no matter how the query is worded, for example a "
+    "genuinely missing second hop, the loop spends its whole round budget without escaping, "
+    "which is worth knowing before you lean on 'more rounds' as a fix for a retrieval problem."
+)
+DIAGRAM = """flowchart LR
+    Q["Question"] --> Sup["Supervisor"]
+    Sup --> R["Retriever<br/>search()"]
+    R --> Rs["Reasoner<br/>drafts answer + evidence"]
+    Rs --> V["Verifier"]
+    V -->|"SUPPORTED"| Ans["Predicted answer"]
+    V -->|"NOT_SUPPORTED[reason]"| Sup2["Supervisor<br/>refines query"]
+    Sup2 --> R
+    V -.->|"round 3 cap,<br/>still not supported"| Ans
+"""
+
 DRAFT_RE = re.compile(r"Draft Answer:\s*(.+)", re.IGNORECASE)
 EVIDENCE_RE = re.compile(r"Evidence:\s*(.+)", re.IGNORECASE | re.DOTALL)
 NOT_SUPPORTED_RE = re.compile(r"NOT_SUPPORTED\[(.+?)\]", re.IGNORECASE | re.DOTALL)

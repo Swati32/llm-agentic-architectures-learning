@@ -38,6 +38,44 @@ PROMPTS = {
     "synthesizer": SYNTHESIZER_SYSTEM_PROMPT,
 }
 
+WHAT_IT_IS = (
+    "The assembly-line pattern: break a task into a fixed sequence of stages, each with one "
+    "narrow responsibility, and run every stage in the same order every time. There's no "
+    "planning step that adapts to what a stage finds; the shape of the pipeline (how many "
+    "stages, what each one does) is decided once, in the code, not per question. This is the "
+    "simplest way to get multiple specialized roles cooperating: each stage is easy to write, "
+    "easy to test in isolation, and easy to reason about, because it only ever sees the fixed "
+    "inputs its position in the pipeline gives it."
+)
+HOW_WE_IMPLEMENTED_IT = (
+    "Four stages, always in this order: a Decomposer call turns the question into exactly 2 "
+    "sub-questions upfront (regex-parsed from a numbered list; if parsing fails, both hops fall "
+    "back to asking the original question). Then Hop 1 and Hop 2 each run the same fixed "
+    "sequence: `search()` the sub-question, then a Reader call answers it from the retrieved "
+    "passage. Neither hop ever looks at the other's output. Finally a Synthesizer call is shown "
+    "the original question plus both sub-question/answer pairs and produces the final answer. "
+    "Handoffs are always exactly 3 (Decomposer to Hop 1, Hop 1 to Hop 2, Hop 2 to Synthesizer) "
+    "and the step count is always 4 model calls plus 2 tool calls, for every question, which is "
+    "what makes this architecture's cost so predictable next to the adaptive ones."
+)
+WHEN_ITS_USEFUL = (
+    "Best when you already know the task's shape and the sub-tasks don't depend on each other's "
+    "results, for example comparison questions, where 'how tall is A' and 'how tall is B' can be "
+    "looked up in either order without needing the other's answer first. You get fixed, "
+    "predictable latency and token cost (useful for capacity planning and pricing), and each "
+    "stage is independently testable, which matters once you have more than a couple of stages "
+    "to maintain. It's the wrong choice once a later stage genuinely needs an earlier stage's "
+    "output to even know what to ask, our bridge-question results are the direct evidence: the "
+    "Decomposer has to guess hop 2's wording before hop 1 has run, and often guesses wrong."
+)
+DIAGRAM = """flowchart LR
+    Q["Question"] --> D["Decomposer<br/>writes 2 sub-questions"]
+    D --> H1["Hop 1<br/>search + read"]
+    H1 --> H2["Hop 2<br/>search + read"]
+    H2 --> S["Synthesizer"]
+    S --> Ans["Predicted answer"]
+"""
+
 
 def run(example: dict, corpus) -> RunResult:
     question = example["question"]
