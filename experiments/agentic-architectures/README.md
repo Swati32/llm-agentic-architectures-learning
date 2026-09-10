@@ -75,6 +75,22 @@ Every architecture had a 0% model-call error rate across all calls, so none of t
 
 See the full results, every prompt, and a step-by-step trace of any question through any architecture in the dashboard: `streamlit run app.py`.
 
+## Why these metrics, and which ones actually mattered
+
+Listing what a metric means isn't the same as knowing whether it did any work. Here's what each category actually bought us, checked against the real numbers above rather than the plan we had before running anything.
+
+**Quality metrics alone would have said almost nothing.** Four of the five architectures tie at 47.5% exact match. Read only the Exact Match column and the honest conclusion is "architecture barely matters here." That conclusion is wrong, and the only reason we know it's wrong is that the other two metric categories were tracked at all.
+
+**Early termination rate was the single most decisive metric in this experiment.** It's what turns "Orchestrator (sequential dispatch) ties for average" into "Orchestrator (sequential dispatch) never once decides it's done, in 40 out of 40 runs." Nothing in the quality metrics hints at this. This is exactly the kind of thing an agentic metric exists to catch: a process that looks fine from its output and isn't, because the thing keeping it bounded is an external cap, not the architecture's own judgment.
+
+**Empty retrieval rate was what explained *why* Supervisor won, not just *that* it won.** Its 9.6% miss rate against 17.5-19.8% everywhere else is a mechanical explanation: better evidence, found through query refinement, not some vaguer claim about better reasoning. Without this metric, "Supervisor scores highest" would be a result with no mechanism behind it.
+
+**Mean handoffs and mean prompt tokens were only informative read against accuracy, never alone.** Orchestrator (sequential dispatch) and Supervisor both average 7 handoffs, the joint-highest in the experiment, for the worst and the best accuracy respectively. Orchestrator (sequential dispatch) also spends the second-most tokens (1,196) for tied-worst accuracy. Neither number means anything by itself; both are the direct evidence that more coordination and more spend don't automatically buy more quality; what that coordination and spend are actually *for* does.
+
+**Tool error rate and model-call error rate did no differentiating work in this run, and that's worth stating plainly rather than omitting.** Both sat at 0% for every architecture. That's not a wasted metric: it's what lets every other finding above be read as a genuine behavioral difference rather than a difference in how often something just broke. A metric that shows no variance is still doing its job if its job was to rule something out.
+
+**Mean state overhead bytes explained a cost mechanism, not a quality outcome.** It's why Single-Agent ReAct is expensive (its whole transcript, carried forward every turn) without being why it's inaccurate. Useful for understanding *where* the cost comes from, not for predicting which architecture wins.
+
 ## What we learned
 
 **1. The adaptive planner never once decided it had enough information, in all 40 runs.** Orchestrator (sequential dispatch)'s early termination rate is 100%: every single run used its full 3-round budget rather than the Planner emitting `Next: DONE`. Looking at the actual planner output makes this concrete. For "Are both Adolfo Bioy Casares and James Norman Hall Argentinian authors?", a clean comparison question, the planner asked for Bioy Casares' nationality, then Hall's nationality (both questions answered after 2 rounds), then invented a third question anyway: "What is the nationality of the co-author of James Norman Hall's novel 'Mutiny on the Bounty'?" It never once judged that it was done; the step cap was the only thing that ever stopped it. This is the direct operational cost of adaptive planning: the architecture is only as bounded as the cap you put on it, not as bounded as the model's own judgment, so budget it like a hard limit you will always hit, not a ceiling you might. This isn't a new discovery: it's the same problem ReAct-style agents were already known to have when a stopping condition depends on the model itself recognizing it has enough ([Yao et al., 2022](https://arxiv.org/abs/2210.03629)); this experiment confirms it shows up in an orchestrator's planner role too, not just a single agent's own loop.

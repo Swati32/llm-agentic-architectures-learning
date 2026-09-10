@@ -315,6 +315,35 @@ with tab_methodology:
     for meta in architectures_meta.values():
         st.markdown(f"**{meta['name']}:** {meta['description']}")
 
+    st.header("Why these metrics")
+    st.markdown(
+        "Three categories, each answering a different question, because no single one of them "
+        "can carry a comparison between control-flow structures on its own:\n\n"
+        "- **Quality metrics** answer *did it get the right answer*. Necessary, but not enough "
+        "on its own: two architectures can land on the same accuracy through very different, "
+        "and very differently trustworthy, processes.\n"
+        "- **Agentic metrics** answer *how did it get there*. This is the category that exists "
+        "specifically because the five architectures here share the same model and the same "
+        "tool, and differ only in control flow, so control flow is exactly what these metrics "
+        "are built to expose.\n"
+        "- **Operational metrics** answer *what did that cost*. A comparison that only asks "
+        "\"which wins\" is incomplete; these price out whatever the agentic metrics reveal."
+    )
+    st.caption(
+        "Which of these actually turned out to be decisive, not just plausible on paper, is its "
+        "own finding: see \"Which metrics actually explained the results\" on the Architecture "
+        "Comparison tab."
+    )
+
+    st.header("Quality metrics")
+    st.markdown(
+        "- **Exact Match**: 1 if the (normalized) predicted answer matches the gold answer exactly, 0 otherwise\n"
+        "- **F1**: token-overlap F1 (SQuAD-style) against the gold answer, giving partial credit for a "
+        "mostly-right span\n"
+        "- Both are also split by **question type** (bridge vs. comparison), since that split is where "
+        "architectures are expected to diverge most"
+    )
+
     st.header("Agentic metrics")
     st.markdown(
         "- **Step / loop count**: how many model or tool calls one question took\n"
@@ -379,6 +408,56 @@ with tab_comparison:
             {"Architecture": meta["name"], "Worked well": best_1, "Also strong": best_2, "Struggled": worst_1, "Also weak": worst_2}
         )
     st.dataframe(pd.DataFrame(overview_rows).set_index("Architecture"), width="stretch")
+
+    st.header("Which metrics actually explained the results")
+    st.caption(
+        "Not every metric we tracked did equal work. This is what each category actually bought "
+        "us, checked against the real numbers, not what we expected going in. See the "
+        "Methodology tab for why each category was chosen in the first place."
+    )
+
+    tied_count = int((quality["exact_match"] == quality["exact_match"].mode().iloc[0]).sum())
+    st.markdown(
+        f"**Quality metrics alone would have said almost nothing.** {tied_count} of the 5 "
+        "architectures tie at 47.5% exact match. Read only that column and the honest "
+        "conclusion is \"architecture barely matters here.\" That conclusion is wrong, and the "
+        "only reason we know it's wrong is that the other two metric categories were tracked at all."
+    )
+    st.markdown(
+        "**Early termination rate was the single most decisive metric in this experiment.** It's "
+        "what turns \"Orchestrator (sequential dispatch) ties for average\" into \"Orchestrator "
+        "(sequential dispatch) never once decides it's done, in 40 out of 40 runs.\" Nothing in "
+        "the quality metrics hints at this. This is exactly what an agentic metric exists to "
+        "catch: a process that looks fine from its output and isn't, because what's keeping it "
+        "bounded is an external cap, not the architecture's own judgment."
+    )
+    st.markdown(
+        "**Empty retrieval rate explained *why* Supervisor won, not just *that* it won.** Its "
+        "9.6% miss rate against 17.5-19.8% everywhere else is a mechanical explanation: better "
+        "evidence, found through query refinement, not a vaguer claim about better reasoning. "
+        "Without this metric, \"Supervisor scores highest\" would be a result with no mechanism "
+        "behind it."
+    )
+    st.markdown(
+        "**Mean handoffs and mean prompt tokens were only informative read against accuracy, "
+        "never alone.** Orchestrator (sequential dispatch) and Supervisor both average 7 "
+        "handoffs, the joint-highest in the experiment, for the worst and the best accuracy "
+        "respectively. Orchestrator (sequential dispatch) also spends the second-most tokens "
+        "(1,196) for tied-worst accuracy. Neither number means anything alone; together they're "
+        "the direct evidence that more coordination and more spend don't automatically buy more "
+        "quality."
+    )
+    st.markdown(
+        "**Tool error rate and model-call error rate did no differentiating work in this run, "
+        "worth stating plainly rather than omitting.** Both sat at 0% for every architecture. "
+        "That's not a wasted metric: it's what lets every finding below be read as a genuine "
+        "behavioral difference rather than a difference in how often something just broke."
+    )
+    st.markdown(
+        "**Mean state overhead bytes explained a cost mechanism, not a quality outcome.** It's "
+        "why Single-Agent ReAct is expensive (its whole transcript, carried forward every turn), "
+        "not why it's inaccurate."
+    )
 
     st.header("Analysis: what happened, and why")
 

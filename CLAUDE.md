@@ -47,6 +47,8 @@ Each experiment is self-contained: the dashboard reads a committed results file 
 
 Choose metrics deliberately per experiment — don't log everything by default. State in the experiment's README *why* each chosen metric fits the technique being evaluated.
 
+Choosing metrics up front isn't enough on its own. Once an experiment has run, add a "why these metrics, and which ones actually mattered" analysis: which of the chosen metrics turned out to be decisive in explaining the results, which were secondary context, and which didn't differentiate anything at all (worth saying plainly, not omitting). Ground this in the real numbers, not the metric's definition. This is standing practice for every experiment from here on: it belongs in the README (near Results) and in the dashboard's comparison view, not just the upfront metric list in Methodology. A metric list defined before the run tells a reader what you planned to look at; this tells them what actually explained what they're seeing.
+
 **Operational metrics** (dashboard on the website, for any LLM call):
 - Tokens used
 - Time to first token
