@@ -18,9 +18,9 @@ from techniques.common import RunResult, llm_step, tool_step
 
 NAME = "Single-Agent ReAct"
 DESCRIPTION = (
-    "One agent loops Thought -> Action -> Observation, deciding at every turn "
-    "whether to search again or finish. No decomposition, no other agents — "
-    "the baseline every other architecture is measured against."
+    "One agent loops Thought, Action, Observation, deciding at every turn "
+    "whether to search again or finish. No decomposition, no other agents. "
+    "This is the baseline every other architecture is measured against."
 )
 MAX_TURNS = 4
 

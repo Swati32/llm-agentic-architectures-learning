@@ -2,7 +2,7 @@
   "architectures": {
     "single_agent_react": {
       "name": "Single-Agent ReAct",
-      "description": "One agent loops Thought -> Action -> Observation, deciding at every turn whether to search again or finish. No decomposition, no other agents \u2014 the baseline every other architecture is measured against.",
+      "description": "One agent loops Thought, Action, Observation, deciding at every turn whether to search again or finish. No decomposition, no other agents. This is the baseline every other architecture is measured against.",
       "prompts": {
         "agent": "You are answering a question that may require looking up multiple facts. You have one tool:\n\nsearch[query] - returns the single most relevant passage for `query` from a fixed set of documents about this question.\n\nWork in a loop. Each turn, write exactly one Thought line and one Action line:\nThought: <your reasoning>\nAction: search[<query>]\n\nor, once you have enough information:\nThought: <your reasoning>\nAction: finish[<final answer>]\n\nGive the shortest correct answer (a name, date, yes or no, etc.), not a full sentence. Do not write anything after the Action line."
       }

@@ -119,12 +119,12 @@ def render_trace(steps: list[dict]) -> None:
                 marker = "✅ hit a gold paragraph"
             else:
                 marker = "❌ hit a distractor paragraph"
-            st.markdown(f"**{i}. [{step['role']}] search(`{step['detail']}`)** — {marker}, {step['latency_seconds']*1000:.0f} ms")
+            st.markdown(f"**{i}. [{step['role']}] search(`{step['detail']}`):** {marker}, {step['latency_seconds']*1000:.0f} ms")
             if step["output"]:
                 st.caption(step["output"][:280] + ("…" if len(step["output"]) > 280 else ""))
         else:
             cost = f"{step['latency_seconds']:.1f}s, {step['prompt_tokens']}+{step['completion_tokens']} tokens"
-            st.markdown(f"**{i}. [{step['role']}] model call** — {step['detail']} ({cost})")
+            st.markdown(f"**{i}. [{step['role']}] model call:** {step['detail']} ({cost})")
             if step["error"]:
                 st.caption(f"Error: {step['error']}")
             elif step["output"]:
@@ -138,6 +138,18 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True,
+)
+
+st.markdown(
+    "**In short:** the Supervisor + Verification Loop won on accuracy (60% exact match, versus "
+    "47.5% for the other four, which all tied), by rescuing bad retrievals through query "
+    "refinement, not by chaining bridge-question hops. The adaptive orchestrator's planner never "
+    "once decided on its own that it had enough information, in all 40 runs, so its step cap did "
+    "100% of the work of stopping it. Single-Agent ReAct had the same problem in a different "
+    "shape: it was right 73% of the time it actually committed to an answer, but committed only "
+    "65% of the time. And running two lookups in parallel produced byte-for-byte identical "
+    "answers to running them one after another, with barely any wall-clock speedup, because the "
+    "local model server serializes requests no matter how many threads call it."
 )
 
 if not RESULTS_PATH.exists():
@@ -168,43 +180,43 @@ with tab_methodology:
         "2 that actually support the answer and 8 unrelated distractors. That "
         "paragraph set is the fixed corpus a `search()` tool retrieves over, "
         "using a small local sentence-transformer "
-        "(`all-MiniLM-L6-v2`) for semantic similarity, not live web search — every "
+        "(`all-MiniLM-L6-v2`) for semantic similarity, not live web search. Every "
         "architecture is judged against exactly the same evidence.\n\n"
         f"Every architecture answers the same **{records['question_id'].nunique()} "
         "sampled questions**, split evenly between the two question types HotpotQA "
         "labels: **bridge** (hop 2 needs an entity hop 1 finds) and **comparison** "
         "(two independent lookups compared against each other). The `search()` tool "
-        "returns only its single best-matching paragraph (k=1) — with 2 gold "
+        "returns only its single best-matching paragraph (k=1). With 2 gold "
         "paragraphs needed, one search can never fully answer a question, forcing "
         "every architecture to actually decide whether and how to search again."
     )
 
     st.header("Architectures compared")
-    for key, meta in architectures_meta.items():
-        st.markdown(f"**{meta['name']}** — {meta['description']}")
+    for meta in architectures_meta.values():
+        st.markdown(f"**{meta['name']}:** {meta['description']}")
 
     st.header("Agentic metrics")
     st.markdown(
-        "- **Step / loop count** — how many model or tool calls one question took\n"
-        "- **Tool execution latency** — wall-clock time spent in `search()` itself\n"
-        "- **Tool error / retry rate** — fraction of runs with at least one failed tool call\n"
-        "- **Inter-agent handoff count** — how many times control passed between roles "
-        "(planner, worker, verifier, ...); 0 for the single-agent baseline by definition\n"
-        "- **Early termination rate** — fraction of runs that hit their step cap without "
-        "a clean finish/verdict, rather than stopping because the architecture decided it was done\n"
-        "- **State overhead** — size (bytes) of the shared state passed at the final handoff; "
-        "for the single agent this is its whole running transcript instead"
+        "- **Step / loop count**: how many model or tool calls one question took\n"
+        "- **Tool execution latency**: wall-clock time spent in `search()` itself\n"
+        "- **Tool error / retry rate**: fraction of runs with at least one failed tool call\n"
+        "- **Inter-agent handoff count**: how many times control passed between roles "
+        "(planner, worker, verifier, ...). It's 0 for the single-agent baseline by definition\n"
+        "- **Early termination rate**: fraction of runs that hit their step cap without "
+        "a clean finish or verdict, rather than stopping because the architecture decided it was done\n"
+        "- **State overhead**: size (bytes) of the shared state passed at the final handoff. "
+        "For the single agent this is its whole running transcript instead"
     )
 
     st.header("Operational metrics")
     st.markdown(
-        "- **Tokens used**, **context payload size** — cost drivers, and directly comparable here "
+        "- **Tokens used**, **context payload size**: cost drivers, and directly comparable here "
         "since every architecture runs on the same local model\n"
-        "- **Latency** and **time to first token** — of the *first* model call in the run\n"
-        "- **Empty retrieval rate** — redefined for this task: since `search()` always returns its "
+        "- **Latency** and **time to first token**: of the *first* model call in the run\n"
+        "- **Empty retrieval rate**: redefined for this task. Since `search()` always returns its "
         "top-1 match, \"empty\" here means the retrieved paragraph wasn't one of the 2 gold "
-        "paragraphs, i.e. a wasted or misleading lookup\n"
-        "- **Error rate** — fraction of model calls that failed outright"
+        "paragraphs, a wasted or misleading lookup\n"
+        "- **Error rate**: fraction of model calls that failed outright"
     )
     st.caption(
         "Semantic cache hit rate isn't tracked in this experiment: nothing here caches across "
