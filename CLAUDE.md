@@ -110,6 +110,7 @@ These apply to every README.md in this repo.
 
 ## Dashboard practices
 
+* Every dashboard's header banner uses the same deep purple to pink gradient: `linear-gradient(135deg, #5B21B6, #DB2777)`, white title text, `padding:1.5rem 1.5rem`, `border-radius:0.5rem`, `margin-bottom:1.5rem`. This is the site's visual identity across experiments, not a per-experiment choice: never pick a different gradient or color scheme for a new dashboard's header.
 * If a prompt has a large, repeated boilerplate section (a full label catalog, a long fixed instruction), collapse it in the display down to a one-line placeholder. Show what's actually distinctive about that call in full (the query, the technique's own instructions, any dynamically chosen examples).
 * When comparing N techniques' prompts, show all N at once (e.g. one expander per technique, same query for all), not a single dropdown that only reveals one at a time. The point of the dashboard is comparison; make that comparison the default view, not something the reader has to click into N times to reconstruct.
 * Don't duplicate the same content across tabs (a technique's description, its metrics) just to fill out a section. If two sections show the same thing two different ways, cut the weaker one.

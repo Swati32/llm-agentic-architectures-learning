@@ -165,7 +165,7 @@ def render_trace(steps: list[dict]) -> None:
 
 st.markdown(
     """
-    <div style="background:linear-gradient(135deg, #0F766E, #1D4ED8);padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
+    <div style="background:linear-gradient(135deg, #5B21B6, #DB2777);padding:1.5rem 1.5rem;border-radius:0.5rem;margin-bottom:1.5rem;">
         <h1 style="color:white;margin:0;font-size:2rem;">Agentic Architectures: Sequential vs. Orchestrator Styles</h1>
     </div>
     """,
