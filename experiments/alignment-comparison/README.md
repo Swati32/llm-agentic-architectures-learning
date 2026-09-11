@@ -2,7 +2,7 @@
 
 This experiment trains the same small model three different ways, SFT, RLHF (with PPO), and DPO, on the same preference data, and compares what each one actually produces. Unlike most of the experiments in this repo, this one doesn't just call a model: it runs real gradient training, locally, on a laptop.
 
-**[Live dashboard](https://swati-alignment-comparison.streamlit.app/)**
+**[Live dashboard](https://swati-alignment-techinques.streamlit.app/)**
 
 **In short:** DPO won decisively, a 75% overall win rate against RLHF's 41% and SFT's 34%, and the reason is visible in the training numbers, not just the outcome: RLHF's reward model scored only 48.1% accuracy on held-out preference pairs, worse than random guessing, while DPO's implicit preference signal hit 71.2% on the same kind of check. At this small scale, RLHF's reward model didn't learn a preference signal reliable enough for PPO to productively optimize against, and it cost roughly 1.5x DPO's training time to get there.
 
