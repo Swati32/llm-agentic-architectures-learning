@@ -2,7 +2,7 @@
 
 This experiment compares 6 ways to build retrieval-augmented generation (RAG): Naive RAG, Hybrid (dense + BM25) RAG, Reranked RAG, HyDE, Query Decomposition RAG, and Corrective RAG (CRAG). It asks which one wins, and specifically at which kind of question, not just which one wins on average. A second, smaller experiment inside this one holds the architecture fixed and varies only how the corpus was chunked before indexing, to separate "what the architecture does with retrieved evidence" from "how good that evidence was to begin with."
 
-*Dashboard not yet deployed to Streamlit Community Cloud — run `streamlit run app.py` locally, or see "Reproducing this" below.*
+**[Live dashboard](https://swati-rag-architectures.streamlit.app/)**
 
 **In short:** Query Decomposition RAG won on overall answer quality (0.675 F1, versus 0.497-0.619 for the rest), but not because it retrieved better evidence: its Recall@k (0.517) and MRR (0.268) were both mediocre-to-worst among the 6. Hybrid RAG had the best retrieval by every retrieval metric (0.650 Recall@k, 0.468 MRR) and still only placed second on F1. And Corrective RAG, the one architecture built specifically to avoid hallucinating, had the *worst* incorrect-abstention rate (40%, refusing to answer questions it could have answered) while its correct-abstention rate on truly unanswerable questions (100%) was no better than Naive RAG's, at roughly double the cost per query.
 
@@ -87,7 +87,7 @@ By question type (F1 for the 3 answerable types, correct-abstention rate for nul
 | Query Decomposition RAG | 0.925 | **0.650** | **0.450** | 95% |
 | Corrective RAG (CRAG) | 0.790 | 0.450 | 0.250 | 100% |
 
-See the full results, every prompt, and a step-by-step trace of any query through any architecture by running the dashboard locally with `streamlit run app.py`.
+See the full results, every prompt, and a step-by-step trace of any query through any architecture in the [live dashboard](https://swati-rag-architectures.streamlit.app/), or run it locally with `streamlit run app.py`.
 
 ## Why these metrics, and which ones actually mattered
 
