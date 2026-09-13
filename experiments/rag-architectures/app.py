@@ -198,6 +198,92 @@ METRIC_TERMINOLOGY = {
     ),
 }
 
+# What each chunking strategy actually does, and why it's in this sweep at
+# all: every strategy answers the same underlying question (how much
+# surrounding context does one retrievable unit carry, and does the cut
+# respect sentence/paragraph structure or ignore it) differently, which is
+# what the Chunking Experiment tab's results are actually measuring the
+# effect of. Keys match chunking/strategies.py's STRATEGIES dict.
+CHUNKING_STRATEGY_INFO = {
+    "fixed_128": {
+        "label": "Fixed 128",
+        "what_it_does": (
+            "Cuts on raw word-count boundaries, every 128 words, with a small overlap, ignoring "
+            "sentence or paragraph structure entirely. The fastest, simplest strategy to implement."
+        ),
+        "why_it_matters": (
+            "A cut can land mid-sentence, so a fact that happens to straddle a chunk boundary ends "
+            "up split across two chunks, complete in neither. Small chunks also mean a very focused "
+            "embedding per chunk, one topic per vector, but more chunks overall to search."
+        ),
+    },
+    "fixed_256": {
+        "label": "Fixed 256",
+        "what_it_does": (
+            "The same raw word-count cut as Fixed 128, just twice the size per chunk (256 words), "
+            "with a proportionally larger overlap."
+        ),
+        "why_it_matters": (
+            "A midpoint in the fixed-size size sweep: still cuts mid-sentence with the same "
+            "probability per cut, but each chunk now carries roughly double the surrounding context, "
+            "testing whether more context per chunk helps or just dilutes the embedding."
+        ),
+    },
+    "fixed_512": {
+        "label": "Fixed 512",
+        "what_it_does": (
+            "The same raw word-count cut again, at 512 words per chunk, the largest fixed-size "
+            "strategy in this sweep."
+        ),
+        "why_it_matters": (
+            "The least likely fixed-size strategy to split a fact in half, simply because there's "
+            "more room in each chunk, at the cost of packing more unrelated content into one "
+            "embedding vector and giving the generator more text to read per chunk retrieved."
+        ),
+    },
+    "sentence": {
+        "label": "Sentence",
+        "what_it_does": (
+            "Packs whole sentences into a chunk, greedily, up to a target size, and starts a new "
+            "chunk rather than ever cutting a sentence in half."
+        ),
+        "why_it_matters": (
+            "Directly fixes the fixed-size strategies' main weakness: a fact-bearing sentence always "
+            "stays whole in one chunk, so it's fully there for retrieval to find, not split across "
+            "a boundary. Costs nothing extra to compute over a fixed-size cut."
+        ),
+    },
+    "recursive": {
+        "label": "Recursive",
+        "what_it_does": (
+            "Splits on paragraph breaks first; if a paragraph is still too big, falls back to "
+            "sentences, then to fixed-size words as a last resort for one very long sentence. "
+            "This experiment's default strategy for the main 6-architecture comparison."
+        ),
+        "why_it_matters": (
+            "The most commonly reached-for strategy in real RAG pipelines (the LangChain-style "
+            "'RecursiveCharacterTextSplitter' pattern): it respects a document's own structure "
+            "(paragraphs) when that structure is well-behaved, and only degrades to a cruder cut "
+            "when it has to."
+        ),
+    },
+    "semantic": {
+        "label": "Semantic",
+        "what_it_does": (
+            "Embeds every individual sentence, then cuts a new chunk wherever the similarity "
+            "between two consecutive sentences' embeddings drops below a threshold, the idea being "
+            "that a topic shift shows up as a dip in how similar two neighboring sentences are."
+        ),
+        "why_it_matters": (
+            "The only strategy here that cuts on *meaning* rather than sentence/paragraph structure "
+            "or a fixed size. It's also the most expensive to build, since it needs one embedding "
+            "call per sentence (not per chunk) just to decide where the boundaries go, and it can "
+            "produce very short, sometimes single-sentence chunks when the source text switches "
+            "topics often."
+        ),
+    },
+}
+
 st.set_page_config(page_title="RAG Architectures Compared", layout="wide")
 
 
@@ -564,10 +650,49 @@ architecture abstains comes from what it retrieved and how, not from different i
             st.warning("No chunking results yet. Run `python3 run_chunking_experiment.py` first.")
         else:
             strategies_meta, chunking_records = load_chunking_results()
+
+            st.subheader("Setup")
             st.markdown(
-                "Architecture held fixed at **Naive RAG**; only the chunking strategy changes. "
-                "This isolates what chunking alone does to retrieval and answer quality, without "
-                "a reranker or fusion step able to compensate for a weak first-pass chunk."
+                "Architecture held fixed at **Naive RAG** (no reranker or fusion step able to "
+                "compensate for a weak first-pass chunk), varying only how the corpus was cut "
+                "before indexing. Naive RAG re-indexes the entire 609-article corpus once per "
+                f"strategy, then answers the same **{chunking_records['question_id'].nunique()} "
+                "sampled queries** (8 per question type) against that strategy's index. This "
+                "isolates what chunking alone does to retrieval and answer quality, holding the "
+                "architecture, the model, and the query set fixed and changing only the chunk "
+                "boundaries themselves."
+            )
+
+            st.subheader("What each strategy does, and why it's here")
+            for key, info in CHUNKING_STRATEGY_INFO.items():
+                if key not in strategies_meta:
+                    continue
+                with st.expander(info["label"]):
+                    st.markdown(f"**What it does.** {info['what_it_does']}")
+                    st.markdown(f"**Why it matters.** {info['why_it_matters']}")
+
+            st.subheader("What we learned")
+            st.markdown(
+                "**Bigger fixed-size chunks retrieved the right evidence more often, but that "
+                "didn't translate into the best answers.** Fixed 512 has the best Recall@k (0.750) "
+                "by a clear margin, a bigger chunk is simply less likely to miss a fact entirely, "
+                "but its F1 (0.562) lands in the middle of the pack, behind strategies with lower "
+                "or equal recall. More surrounding, possibly irrelevant text rides along with the "
+                "fact that matters.\n\n"
+                "**Sentence-aware chunking beat both smaller and larger fixed-size cuts on the "
+                "metric it should most directly affect.** Never splitting a fact-bearing sentence "
+                "across a boundary gave Sentence chunking the second-best Recall@k (0.708) using "
+                "much smaller chunks (155 tokens average) than Fixed 512 (460 tokens).\n\n"
+                "**Semantic chunking tied for the best F1 despite chunk sizes varying wildly**, "
+                "from 1 token to 608. The smallest chunks are likely isolated short sentences that "
+                "got cut off on their own, which is probably also why Semantic chunking has the "
+                "lowest faithfulness (0.632) and the lowest correct-abstention rate (87.5%) in this "
+                "sub-experiment: a too-short chunk can still register as topically close enough to "
+                "retrieve, without carrying enough context to ground an answer well.\n\n"
+                "32 queries (8 per type) is small enough that a single query flipping from correct "
+                "to incorrect moves a subgroup's F1 by 0.125, so read the exact ranking above as "
+                "directional, not precise. See the README's chunking section for the full numbers "
+                "and the general chunking-practice takeaways this points to."
             )
 
             st.subheader("Chunk statistics by strategy")
