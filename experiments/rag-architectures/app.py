@@ -62,6 +62,136 @@ LOWER_IS_BETTER = {
     "mean_wall_clock_seconds", "empty_retrieval_rate", "error_rate",
 }
 
+# Mirrors the README's Terminology section, including the metrics shown in
+# the Architecture Deep Dive tab's own Metrics table below, so a reader
+# doesn't have to leave the dashboard to look up what a number means.
+TERMINOLOGY = {
+    "Chunk": (
+        "A piece of a longer document, split up so it's small enough to embed meaningfully and "
+        "retrieve individually. A whole 70,000-character news article can't be usefully compared "
+        "against a short query as one embedding; chunking is what makes retrieval granular enough "
+        "to work at all."
+    ),
+    "Embedding": (
+        "A list of numbers (a vector) that a model produces to represent the meaning of a piece of "
+        "text, such that text with similar meaning ends up with similar-looking vectors, even if it "
+        "shares no exact words. \"Who leads the company\" and \"chief executive officer\" can end up "
+        "close together in embedding space despite sharing no words at all."
+    ),
+    "Dense retrieval (semantic search) vs. BM25": (
+        "Two different, opposite ways to rank chunks against a query, and the two signals Hybrid "
+        "RAG fuses together.\n\n"
+        "**Dense retrieval** embeds the query and every candidate chunk as vectors, then ranks "
+        "chunks by how close their vector is to the query's (cosine similarity). Its strength is "
+        "meaning: it can match a paraphrase that shares no words with the source text. Its weakness "
+        "is that same fuzziness: it can miss an exact name, date, or number that a keyword search "
+        "would catch instantly.\n\n"
+        "**BM25** is a classic, decades-old keyword-ranking function that scores a chunk against a "
+        "query purely by term frequency, how often the query's actual words appear in the chunk, "
+        "weighted by how rare those words are across the corpus. It has no notion of meaning, so it "
+        "can't find a paraphrase, but it never misses an exact word that's actually written in the "
+        "text.\n\n"
+        "In short: dense retrieval finds a chunk that *means* the same thing; BM25 finds a chunk "
+        "that *says* the same thing."
+    ),
+    "Reciprocal rank fusion (RRF)": (
+        "A way to merge two separately-ranked lists (e.g. one from dense search, one from BM25) "
+        "into a single ranking, using each item's *position* in each list rather than its raw "
+        "score. This avoids the problem that a cosine similarity and a BM25 score live on "
+        "completely different, incomparable numeric scales."
+    ),
+    "Cross-encoder": (
+        "A model that scores a (query, passage) pair by reading both together in one forward pass, "
+        "as opposed to a bi-encoder (what dense retrieval uses), which embeds the query and the "
+        "passage independently and compares the two vectors afterward. A cross-encoder is more "
+        "accurate because it can attend across the two texts directly, but far too slow to run over "
+        "an entire corpus, which is why it's only ever used to rerank a shortlist a cheaper method "
+        "narrowed first."
+    ),
+    "HyDE (Hypothetical Document Embeddings)": (
+        "Retrieving using the embedding of a model-generated hypothetical answer instead of the "
+        "embedding of the raw query, on the idea that a hypothetical answer is phrased more like "
+        "the real supporting text than a question is."
+    ),
+    "Query decomposition": (
+        "Splitting one question into several simpler, self-contained sub-questions, retrieving "
+        "separately for each, and combining the results. Aimed at questions that are really more "
+        "than one lookup wearing one sentence, like a comparison between two things."
+    ),
+    "Corrective RAG (CRAG)": (
+        "Explicitly grading whether retrieved evidence is actually relevant before generating an "
+        "answer from it, and taking a corrective action (retrieve again differently, or abstain) "
+        "rather than trusting whatever the first retrieval pass returned."
+    ),
+    "Recall@k / Precision@k / MRR": (
+        "Standard information-retrieval metrics. Recall@k: did a relevant (gold) item appear "
+        "anywhere in the top k retrieved. Precision@k: what fraction of the top k retrieved were "
+        "actually relevant. MRR: the reciprocal of the rank of the first relevant item (1/1 if "
+        "it's first, 1/2 if second, etc.), averaged across queries, rewarding a relevant item "
+        "appearing earlier over appearing later."
+    ),
+    "Faithfulness / groundedness": (
+        "Whether an answer's claims are actually supported by the retrieved context, as opposed to "
+        "being correct by coincidence (or memorized from training) while citing context that "
+        "doesn't actually back it up. The gold-standard way to check this is an LLM judge comparing "
+        "each claim in the answer against the context; this experiment uses a cheaper "
+        "lexical-overlap proxy instead."
+    ),
+    "Exact Match / F1": (
+        "Two ways of scoring a predicted answer against the correct one. Exact Match is strict: 1 "
+        "if the (normalized) strings match exactly, 0 otherwise. F1 gives partial credit based on "
+        "word overlap, so a predicted answer that's mostly right but missing or adding a word still "
+        "scores above zero."
+    ),
+    "Abstention (correct / incorrect)": (
+        "Whether an architecture said \"Insufficient information.\" instead of giving a real "
+        "answer. Abstaining is *correct* on a null query, where the corpus genuinely has no answer, "
+        "and *incorrect* on an answerable query, where it means the architecture gave up on a "
+        "question it could have answered. The same behavior is a win in one case and a failure in "
+        "the other, which is why this experiment tracks the two rates separately."
+    ),
+    "LLM calls / retrieval rounds": (
+        "How many separate calls to the language model, and how many separate retrieval attempts, "
+        "one query needed. HyDE and Query Decomposition each make 2 LLM calls per query (versus 1 "
+        "for the single-pass architectures) because each needs an extra call before the final "
+        "answer. A round counts a retry as a new attempt; a multi-query fan-out (several "
+        "sub-queries searched at once) still counts as 1 round."
+    ),
+    "Prompt tokens / completion tokens": (
+        "How much text, measured in tokens (roughly, word-pieces), a call sends to the model "
+        "(prompt) and gets back (completion). Prompt tokens track with how many chunks and how big "
+        "they are; completion tokens track with how much the model had to write."
+    ),
+    "Latency / wall-clock time": (
+        "Latency is how long a single model call took, start to finish. Wall-clock time is how "
+        "long the *whole* query took, including every retrieval call and every LLM call in the "
+        "run, which is what actually matters to whoever is waiting on an answer."
+    ),
+    "Time to first token (TTFT)": (
+        "How long a model takes to start responding, as opposed to latency, which includes the "
+        "time to finish the whole response. It's the metric closest to how responsive a system "
+        "*feels*, since a user is waiting on the first token, not the last one. This dashboard "
+        "reports the *median* TTFT rather than the mean, because a local-serving artifact hit "
+        "during this experiment's own run corrupted a handful of raw TTFT values badly enough to "
+        "make the mean meaningless (see the README's \"Why these metrics\" section)."
+    ),
+    "Context payload bytes": (
+        "The size, in bytes, of everything sent to the model in one call: the system prompt, the "
+        "passages, the question. It's a proxy for how much the model has to read before it can "
+        "answer, distinct from token count because it's measured before tokenization."
+    ),
+    "Empty retrieval rate": (
+        "How often a retrieval call came back with literally zero chunks. With a shared corpus of "
+        "thousands of chunks, a plain top-k search essentially never returns fewer than k results, "
+        "so this metric mostly matters for a narrower, more specific search that could plausibly "
+        "find nothing."
+    ),
+    "Error rate": (
+        "How often a model call failed outright (a timeout, a malformed response, a dropped "
+        "connection), as opposed to succeeding but giving a wrong or unhelpful answer."
+    ),
+}
+
 st.set_page_config(page_title="RAG Architectures Compared", layout="wide")
 
 
@@ -120,21 +250,73 @@ def notable_metrics(combined: pd.DataFrame, architecture_key: str, side: str, co
 
 
 def render_mermaid(diagram: str, height: int = 220) -> None:
+    # The actual root cause, found by inspecting a broken render directly:
+    # mermaid.min.js auto-initializes itself the instant it finishes
+    # loading, using its own default config, whenever document.readyState
+    # is already "complete" — which it always is here, since the script is
+    # injected well after the page (and the iframe) has already loaded.
+    # That auto-run fires immediately, before this function's own
+    # `mermaid.initialize({startOnLoad: false, ...})` call ever gets a
+    # chance to run, and before the container has a real, settled layout
+    # width — so it measures label sizes against a not-yet-correct width
+    # and silently renders a tiny (a few pixels) but "successfully
+    # processed" SVG. Because mermaid marks a node `data-processed` once
+    # it's handled it, this function's own later, careful render call
+    # then gets silently skipped as a no-op: not an error, just nothing.
+    #
+    # The fix is structural, not a timing tweak: give mermaid nothing to
+    # auto-discover. The diagram source sits inertly in a plain
+    # <script type="text/plain"> tag (never rendered, never scanned by
+    # mermaid) until this code explicitly moves it into a `.mermaid` div
+    # and calls mermaid.run() itself, once, at a time of its own choosing
+    # (after the CDN script has loaded and the container's width has been
+    # stable for several consecutive animation frames).
     components.html(
         f"""
-        <div class="mermaid" id="diagram" style="font-family: sans-serif;">{diagram}</div>
-        <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+        <div id="diagram-container" style="font-family: sans-serif;"></div>
+        <script id="diagram-source" type="text/plain">{diagram}</script>
         <script>
-            mermaid.initialize({{ startOnLoad: false, flowchart: {{ useMaxWidth: true }} }});
-            function renderWhenReady(attemptsLeft) {{
-                var el = document.getElementById("diagram");
-                if (el.offsetWidth > 0 || attemptsLeft <= 0) {{
-                    mermaid.run({{ nodes: [el] }});
+            function doRender() {{
+                var container = document.getElementById("diagram-container");
+                container.className = "mermaid";
+                container.textContent = document.getElementById("diagram-source").textContent;
+                mermaid.initialize({{ startOnLoad: false, flowchart: {{ useMaxWidth: true }} }});
+                mermaid.run({{ nodes: [container] }});
+            }}
+
+            function waitForStableWidth(lastWidth, stableCount, attemptsLeft) {{
+                // setTimeout, not requestAnimationFrame: rAF callbacks can be
+                // paused indefinitely for content that isn't currently
+                // visible (a backgrounded browser tab, a scrolled-out or
+                // not-yet-painted iframe), which would leave this loop, and
+                // the diagram, stuck forever with no visible error.
+                // setTimeout keeps firing regardless.
+                var width = document.getElementById("diagram-container").offsetWidth;
+                var stable = width > 0 && width === lastWidth;
+                if ((stable && stableCount >= 5) || attemptsLeft <= 0) {{
+                    document.fonts.ready.then(doRender);
                 }} else {{
-                    requestAnimationFrame(function () {{ renderWhenReady(attemptsLeft - 1); }});
+                    setTimeout(function () {{
+                        waitForStableWidth(width, stable ? stableCount + 1 : 0, attemptsLeft - 1);
+                    }}, 16);
                 }}
             }}
-            renderWhenReady(60);
+
+            function loadMermaid(retriesLeft) {{
+                var script = document.createElement("script");
+                script.src = "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js";
+                script.onload = function () {{ waitForStableWidth(-1, 0, 300); }};
+                script.onerror = function () {{
+                    if (retriesLeft > 0) {{
+                        setTimeout(function () {{ loadMermaid(retriesLeft - 1); }}, 500);
+                    }} else {{
+                        document.getElementById("diagram-container").innerText =
+                            "Diagram failed to load (network issue reaching the mermaid CDN). Reloading the page usually fixes this.";
+                    }}
+                }};
+                document.head.appendChild(script);
+            }}
+            loadMermaid(4);
         </script>
         """,
         height=height,
@@ -195,7 +377,7 @@ def main() -> None:
     combined = combined_metrics(records)
     by_type = quality_by_question_type(records)
 
-    tabs = st.tabs(["Methodology", "Comparison", "Architecture Deep Dive", "Query Explorer", "Chunking Experiment", "Embedding Quality"])
+    tabs = st.tabs(["Methodology", "Terminology", "Comparison", "Architecture Deep Dive", "Query Explorer", "Chunking Experiment", "Embedding Quality"])
 
     # ---- Methodology ---------------------------------------------------
     with tabs[0]:
@@ -224,8 +406,16 @@ architecture abstains comes from what it retrieved and how, not from different i
         for key, module in ARCHITECTURES.items():
             st.markdown(f"**{module.NAME}** — {module.DESCRIPTION}")
 
-    # ---- Comparison ------------------------------------------------------
+    # ---- Terminology ----------------------------------------------------
     with tabs[1]:
+        st.header("Terminology")
+        st.caption("Definitions for the terms and metrics used throughout this dashboard, including the Architecture Deep Dive tab's Metrics table.")
+        for term, definition in TERMINOLOGY.items():
+            with st.expander(term):
+                st.markdown(definition)
+
+    # ---- Comparison ------------------------------------------------------
+    with tabs[2]:
         st.header("Cross-Architecture Comparison")
 
         st.subheader("Overall metrics")
@@ -266,7 +456,7 @@ architecture abstains comes from what it retrieved and how, not from different i
                         st.markdown(f"- {METRIC_LABELS.get(metric, metric)}: {format_metric(metric, value)} (rank {rank}/{n})")
 
     # ---- Architecture Deep Dive -------------------------------------------
-    with tabs[2]:
+    with tabs[3]:
         st.header("Architecture Deep Dive")
         architecture_key = st.selectbox(
             "Architecture", options=list(architectures_meta.keys()),
@@ -295,7 +485,7 @@ architecture abstains comes from what it retrieved and how, not from different i
         st.dataframe(row.rename(columns=METRIC_LABELS), width="stretch")
 
     # ---- Query Explorer ----------------------------------------------
-    with tabs[3]:
+    with tabs[4]:
         st.header("Query Explorer")
         st.markdown("See every architecture's answer to the same query, side by side.")
 
@@ -330,7 +520,7 @@ architecture abstains comes from what it retrieved and how, not from different i
                 render_step_trace(rec["steps"])
 
     # ---- Chunking Experiment -------------------------------------------
-    with tabs[4]:
+    with tabs[5]:
         st.header("Chunking Sub-Experiment")
         if not CHUNKING_RESULTS_PATH.exists():
             st.warning("No chunking results yet. Run `python3 run_chunking_experiment.py` first.")
@@ -371,7 +561,7 @@ architecture abstains comes from what it retrieved and how, not from different i
             st.bar_chart(chunk_summary[["recall_at_k", "f1"]])
 
     # ---- Embedding Quality -----------------------------------------------
-    with tabs[5]:
+    with tabs[6]:
         st.header("Ensuring Embedding Quality")
         st.markdown(
             """

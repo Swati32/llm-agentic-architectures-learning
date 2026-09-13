@@ -21,6 +21,11 @@ RERANK_K = 5
 PROMPTS = {"generator": ANSWER_SYSTEM_PROMPT}
 
 WHAT_IT_IS = (
+    "The difference from Naive RAG in one line: Naive RAG does one dense search for the top 5 "
+    "chunks and stops there; Reranked RAG does that same kind of dense search but pulls a much "
+    "wider top 20, then spends a second, more careful pass narrowing those 20 down to 5 before "
+    "generation ever sees them. Same first-pass retrieval mechanism, one extra narrowing step. "
+    "\n\n"
     "A bi-encoder (what dense_search uses) embeds the query and every chunk *independently*, "
     "then compares the two vectors with cosine similarity — fast enough to run over an entire "
     "corpus, because every chunk's embedding is computed once, offline, before any query "
