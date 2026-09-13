@@ -128,7 +128,7 @@ CONCEPT_TERMINOLOGY = {
 # The metrics shown in the Comparison tab's tables, defined right there
 # rather than in the Terminology tab, so a reader can look up what a
 # column means without leaving the comparison they're actually looking at.
-METRIC_TERMINOLOGY = {
+RAG_METRIC_TERMINOLOGY = {
     "Recall@k / Precision@k / MRR": (
         "Standard information-retrieval metrics. Recall@k: did a relevant (gold) item appear "
         "anywhere in the top k retrieved. Precision@k: what fraction of the top k retrieved were "
@@ -196,6 +196,17 @@ METRIC_TERMINOLOGY = {
         "How often a model call failed outright (a timeout, a malformed response, a dropped "
         "connection), as opposed to succeeding but giving a wrong or unhelpful answer."
     ),
+}
+
+# The chunking sub-experiment only tracks retrieval and generation quality
+# (see run_chunking_experiment.py's build_record), not the operational
+# metrics (tokens, latency, LLM calls) — chunking doesn't change how many
+# calls a query makes, only what each call's retrieved context contains.
+# So its definitions are a subset of RAG_METRIC_TERMINOLOGY, not a
+# separate write-up, kept in sync by pulling from the same source text.
+CHUNKING_METRIC_TERMINOLOGY = {
+    key: RAG_METRIC_TERMINOLOGY[key]
+    for key in ["Recall@k / Precision@k / MRR", "Exact Match / F1", "Faithfulness / groundedness", "Abstention (correct / incorrect)"]
 }
 
 # What each chunking strategy actually does, and why it's in this sweep at
@@ -342,54 +353,85 @@ def notable_metrics(combined: pd.DataFrame, architecture_key: str, side: str, co
 
 
 def render_mermaid(diagram: str, height: int = 220) -> None:
-    # The actual root cause, found by inspecting a broken render directly:
-    # mermaid.min.js auto-initializes itself the instant it finishes
-    # loading, using its own default config, whenever document.readyState
-    # is already "complete" — which it always is here, since the script is
-    # injected well after the page (and the iframe) has already loaded.
-    # That auto-run fires immediately, before this function's own
-    # `mermaid.initialize({startOnLoad: false, ...})` call ever gets a
-    # chance to run, and before the container has a real, settled layout
-    # width — so it measures label sizes against a not-yet-correct width
-    # and silently renders a tiny (a few pixels) but "successfully
-    # processed" SVG. Because mermaid marks a node `data-processed` once
-    # it's handled it, this function's own later, careful render call
-    # then gets silently skipped as a no-op: not an error, just nothing.
+    # Three real bugs, found by inspecting broken renders directly rather
+    # than guessing at timing:
     #
-    # The fix is structural, not a timing tweak: give mermaid nothing to
-    # auto-discover. The diagram source sits inertly in a plain
-    # <script type="text/plain"> tag (never rendered, never scanned by
-    # mermaid) until this code explicitly moves it into a `.mermaid` div
-    # and calls mermaid.run() itself, once, at a time of its own choosing
-    # (after the CDN script has loaded and the container's width has been
-    # stable for several consecutive animation frames).
+    # (1) mermaid.min.js auto-initializes itself the instant it loads,
+    # using its own defaults, whenever document.readyState is already
+    # "complete" — true here, since the script loads well after the page
+    # has. Fixed structurally: the diagram source sits inertly in a
+    # <script type="text/plain"> tag, invisible to mermaid, until this
+    # code explicitly moves it into a `.mermaid` div and calls
+    # mermaid.run() itself.
+    # (2) The width-readiness poll used requestAnimationFrame, which can
+    # be paused indefinitely for content that isn't currently visible
+    # (Streamlit's tab panels, a backgrounded browser tab). Fixed by
+    # polling with setTimeout instead, which keeps firing regardless.
+    # (3) mermaid.run()'s returned promise can resolve *before* its own
+    # internal layout pass has actually finished — checking the result
+    # immediately in that promise's `.then()` sometimes reads a
+    # transiently tiny SVG and (worse) retrying right away, before the
+    # first pass has truly finished, collides with it and corrupts the
+    # element's state entirely (confirmed directly: a manual, single,
+    # unhurried call always renders correctly; an immediate reactive
+    # retry sometimes does not). So the degeneracy check here waits a
+    # fixed, generous delay *after* the call instead of reacting to the
+    # promise, and retries at most once.
     components.html(
         f"""
         <div id="diagram-container" style="font-family: sans-serif;"></div>
         <script id="diagram-source" type="text/plain">{diagram}</script>
         <script>
-            function doRender() {{
-                var container = document.getElementById("diagram-container");
+            var diagramSource = document.getElementById("diagram-source").textContent;
+
+            function isDegenerate(container) {{
+                var svg = container.querySelector("svg");
+                if (!svg) return true;
+                var vb = svg.viewBox && svg.viewBox.baseVal;
+                return !vb || vb.width < 50 || vb.height < 20;
+            }}
+
+            function renderOnce(container) {{
+                container.removeAttribute("data-processed");
                 container.className = "mermaid";
-                container.textContent = document.getElementById("diagram-source").textContent;
+                container.textContent = diagramSource;
                 mermaid.initialize({{ startOnLoad: false, flowchart: {{ useMaxWidth: true }} }});
                 mermaid.run({{ nodes: [container] }});
             }}
 
-            function waitForStableWidth(lastWidth, stableCount, attemptsLeft) {{
-                // setTimeout, not requestAnimationFrame: rAF callbacks can be
-                // paused indefinitely for content that isn't currently
-                // visible (a backgrounded browser tab, a scrolled-out or
-                // not-yet-painted iframe), which would leave this loop, and
-                // the diagram, stuck forever with no visible error.
-                // setTimeout keeps firing regardless.
+            function doRender() {{
+                var container = document.getElementById("diagram-container");
+                renderOnce(container);
+                setTimeout(function () {{
+                    if (!isDegenerate(container)) return;
+                    renderOnce(container);
+                    setTimeout(function () {{
+                        if (isDegenerate(container)) {{
+                            container.innerText =
+                                "Diagram didn't render correctly. Reloading the page usually fixes this.";
+                        }}
+                    }}, 1200);
+                }}, 1200);
+            }}
+
+            function waitForStableWidth(startedAt, lastWidth, stableCount, attemptsLeft) {{
+                // setTimeout, not requestAnimationFrame: see note (2) above.
+                // Width stabilizing quickly is necessary but not sufficient —
+                // observed directly: this environment's real paint/layout
+                // settling can take noticeably longer than the width alone
+                // suggests, and rendering the instant width looks stable
+                // still produced a degenerate SVG. So on top of the width
+                // check, also enforce a minimum floor of real elapsed time
+                // since the script started loading, however fast the width
+                // itself stabilized.
                 var width = document.getElementById("diagram-container").offsetWidth;
                 var stable = width > 0 && width === lastWidth;
-                if ((stable && stableCount >= 5) || attemptsLeft <= 0) {{
+                var minTimeElapsed = (Date.now() - startedAt) >= 1500;
+                if ((stable && stableCount >= 5 && minTimeElapsed) || attemptsLeft <= 0) {{
                     document.fonts.ready.then(doRender);
                 }} else {{
                     setTimeout(function () {{
-                        waitForStableWidth(width, stable ? stableCount + 1 : 0, attemptsLeft - 1);
+                        waitForStableWidth(startedAt, width, stable ? stableCount + 1 : 0, attemptsLeft - 1);
                     }}, 16);
                 }}
             }}
@@ -397,7 +439,7 @@ def render_mermaid(diagram: str, height: int = 220) -> None:
             function loadMermaid(retriesLeft) {{
                 var script = document.createElement("script");
                 script.src = "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js";
-                script.onload = function () {{ waitForStableWidth(-1, 0, 300); }};
+                script.onload = function () {{ waitForStableWidth(Date.now(), -1, 0, 400); }};
                 script.onerror = function () {{
                     if (retriesLeft > 0) {{
                         setTimeout(function () {{ loadMermaid(retriesLeft - 1); }}, 500);
@@ -537,11 +579,6 @@ architecture abstains comes from what it retrieved and how, not from different i
             "mechanisms behind them, and what this task does and doesn't test."
         )
 
-        with st.expander("What do these metrics mean?"):
-            for term, definition in METRIC_TERMINOLOGY.items():
-                st.markdown(f"**{term}.** {definition}")
-                st.divider()
-
         st.subheader("Overall metrics")
         display = combined.copy()
         for metric in display.columns:
@@ -607,6 +644,12 @@ architecture abstains comes from what it retrieved and how, not from different i
         for metric in row.columns:
             row[metric] = row[metric].map(lambda v, m=metric: format_metric(m, v))
         st.dataframe(row.rename(columns=METRIC_LABELS), width="stretch")
+
+        st.markdown("### Evaluation metrics, defined")
+        st.caption("What each column in the table above (and the Comparison tab's tables) actually measures.")
+        for term, definition in RAG_METRIC_TERMINOLOGY.items():
+            with st.expander(term):
+                st.markdown(definition)
 
     # ---- Query Explorer ----------------------------------------------
     with tabs[4]:
@@ -722,6 +765,17 @@ architecture abstains comes from what it retrieved and how, not from different i
                 chunk_summary_display[metric] = chunk_summary_display[metric].map(lambda v, m=metric: format_metric(m, v))
             st.dataframe(chunk_summary_display.rename(columns=METRIC_LABELS), width="stretch")
             st.bar_chart(chunk_summary[["recall_at_k", "f1"]])
+
+            st.subheader("Evaluation metrics, defined")
+            st.caption(
+                "What each column in the tables above actually measures. Chunking only changes "
+                "what a retrieval call finds, not how many calls a query makes, so the operational "
+                "metrics (tokens, latency, LLM calls) shown for architectures elsewhere in this "
+                "dashboard aren't tracked here — see the Architecture Deep Dive tab for those."
+            )
+            for term, definition in CHUNKING_METRIC_TERMINOLOGY.items():
+                with st.expander(term):
+                    st.markdown(definition)
 
     # ---- Embedding Quality -----------------------------------------------
     with tabs[6]:
