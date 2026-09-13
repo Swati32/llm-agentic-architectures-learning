@@ -65,7 +65,7 @@ LOWER_IS_BETTER = {
 # Mirrors the README's Terminology section, including the metrics shown in
 # the Architecture Deep Dive tab's own Metrics table below, so a reader
 # doesn't have to leave the dashboard to look up what a number means.
-TERMINOLOGY = {
+CONCEPT_TERMINOLOGY = {
     "Chunk": (
         "A piece of a longer document, split up so it's small enough to embed meaningfully and "
         "retrieve individually. A whole 70,000-character news article can't be usefully compared "
@@ -123,6 +123,12 @@ TERMINOLOGY = {
         "answer from it, and taking a corrective action (retrieve again differently, or abstain) "
         "rather than trusting whatever the first retrieval pass returned."
     ),
+}
+
+# The metrics shown in the Comparison tab's tables, defined right there
+# rather than in the Terminology tab, so a reader can look up what a
+# column means without leaving the comparison they're actually looking at.
+METRIC_TERMINOLOGY = {
     "Recall@k / Precision@k / MRR": (
         "Standard information-retrieval metrics. Recall@k: did a relevant (gold) item appear "
         "anywhere in the top k retrieved. Precision@k: what fraction of the top k retrieved were "
@@ -409,14 +415,46 @@ architecture abstains comes from what it retrieved and how, not from different i
     # ---- Terminology ----------------------------------------------------
     with tabs[1]:
         st.header("Terminology")
-        st.caption("Definitions for the terms and metrics used throughout this dashboard, including the Architecture Deep Dive tab's Metrics table.")
-        for term, definition in TERMINOLOGY.items():
+        st.caption("Definitions for the retrieval and architecture concepts used throughout this dashboard. Metric definitions live in the Comparison tab, next to the tables they describe.")
+        for term, definition in CONCEPT_TERMINOLOGY.items():
             with st.expander(term):
                 st.markdown(definition)
 
     # ---- Comparison ------------------------------------------------------
     with tabs[2]:
         st.header("Cross-Architecture Comparison")
+
+        st.subheader("In short")
+        st.markdown(
+            "**Query Decomposition RAG won overall** (0.675 F1) despite having the *worst* MRR "
+            "(0.268) and second-worst Recall@k (0.517) of any architecture, a corpus-redundancy "
+            "effect rather than better retrieval: it searches per sub-question and ends up with "
+            "more distinct chunks per query (7.1 vs. 5.0 for the single-pass architectures), so "
+            "it has more chances to surface the right named entity even when it misses the one "
+            "designated 'gold' evidence sentence.\n\n"
+            "**Hybrid RAG had the best retrieval quality** by every retrieval metric (0.650 "
+            "Recall@k, 0.468 MRR), confirming that fusing dense and BM25 search recovers evidence "
+            "neither finds reliably alone, but that didn't translate into the top F1 score: "
+            "'best retrieval' and 'best final answer' turned out to be different questions here.\n\n"
+            "**Corrective RAG's grading step didn't pay for itself.** Its correct-abstention rate "
+            "on null queries (100%) is identical to Naive, Hybrid, and Reranked RAG's, all of "
+            "which get there with no grading step at all, just the shared prompt's plain "
+            "instruction not to guess. What the grading step *did* add is the worst "
+            "incorrect-abstention rate in the experiment (40%, refusing answerable questions), at "
+            "roughly double the LLM calls and wall-clock time per query.\n\n"
+            "**The per-question-type breakdown tells a different story than the overall averages "
+            "do.** Every architecture except HyDE ties near 0.92 F1 on Inference questions, but "
+            "Comparison F1 spans 0.400 to 0.650 and Temporal F1 sits stuck at 0.250-0.450 for "
+            "every architecture, a ceiling that looks like the model's own reasoning limits, not "
+            "the retrieval mechanism.\n\n"
+            "See the README's *What we learned* section for the full numbered findings, the "
+            "mechanisms behind them, and what this task does and doesn't test."
+        )
+
+        with st.expander("What do these metrics mean?"):
+            for term, definition in METRIC_TERMINOLOGY.items():
+                st.markdown(f"**{term}.** {definition}")
+                st.divider()
 
         st.subheader("Overall metrics")
         display = combined.copy()
