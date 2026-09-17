@@ -1,0 +1,4 @@
+-r requirements.txt
+datasets
+sentence-transformers
+numpy
