@@ -1,11 +1,9 @@
 """Runs every system shape over the same sample of HotpotQA questions,
 against the same per-question retrieval corpus, and writes one combined
-results/records.json for the Streamlit app to read. Same dataset and sample
-size as experiments/agentic-architectures, on purpose: this experiment
+results/records.json for the Streamlit app to read. This experiment
 varies the *shape* (plain LLM, RAG, single agent, multi-agent) while
-holding the task fixed, rather than varying techniques within one shape the
-way the prior two experiments did. Run with `python3 -u run_experiment.py`
-so progress prints show up immediately rather than buffering until the
+holding the task fixed. Run with `python3 -u run_experiment.py` so
+progress prints show up immediately rather than buffering until the
 process exits.
 """
 

@@ -4,15 +4,15 @@ across shapes means any difference in the results comes from *shape*, what
 kind of decision-making structure the system has, not from different
 wording of the underlying sub-tasks.
 
-Adds one thing agentic-architectures' common.py doesn't track: which
-paragraph title a tool_call step actually retrieved. That's what makes
-`redundant_step_rate` computable below, the metric this experiment adds to
-test whether MAST's most common real-world multi-agent failure mode (step
-repetition, https://arxiv.org/abs/2503.13657) shows up here, operationalized
-concretely as: a later tool call retrieving a title an earlier tool call in
-the same run already retrieved. That's a narrower, single-tool version of
-"redoing work already done", not every way a system can repeat itself, see
-this experiment's README for what it does and doesn't catch.
+Tracks one extra thing: which paragraph title a tool_call step actually
+retrieved. That's what makes `redundant_step_rate` computable below, the
+metric this experiment adds to test for MAST's most common documented
+multi-agent failure mode (step repetition, https://arxiv.org/abs/2503.13657),
+operationalized concretely as: a later tool call retrieving a title an
+earlier tool call in the same run already retrieved. That's a narrower,
+single-tool version of "redoing work already done", not every way a
+system can repeat itself, see this experiment's README for what it does
+and doesn't catch.
 """
 
 import re

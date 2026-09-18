@@ -1,8 +1,15 @@
 """Streamlit dashboard for the EVALUATION_CRITERIA.md framework doc at the
 repo root. This is not an experiment with its own results/records.json:
-it renders that one markdown file directly, split into tabs, so the
-dashboard and the doc can never drift out of sync with each other. Edit
-EVALUATION_CRITERIA.md; this app picks the change up on its next reload.
+it renders that one markdown file directly, so the dashboard and the doc
+can never drift out of sync with each other. Edit EVALUATION_CRITERIA.md;
+this app picks the change up on its next reload.
+
+Single page, no tabs, on purpose: the dashboard only shows the three
+sections a reader actually needs to use this framework (the four shapes,
+the metrics that apply to them, and the decision framework for choosing
+between them). Open gaps, future work, grounding research, and
+reproducing this stay in the source document, readable on GitHub, but
+aren't duplicated here.
 """
 
 import re
@@ -14,14 +21,7 @@ import streamlit.components.v1 as components
 DOC_PATH = Path(__file__).parent.parent.parent / "EVALUATION_CRITERIA.md"
 MERMAID_RE = re.compile(r"```mermaid\n(.*?)\n```", re.DOTALL)
 
-TABS = [
-    ("Overview", ["The four system shapes", "Terminology"]),
-    ("Criteria Catalog", ["Criteria catalog"]),
-    ("Decision Framework", ["The decision framework"]),
-    ("Cross-Experiment Evidence", ["Cross-experiment evidence"]),
-    ("Open Gaps & Future Work", ["Open gaps this framework doesn't resolve yet", "Future work"]),
-    ("Research", ["Grounding research", "Reproducing this"]),
-]
+SECTIONS = ["The four system shapes", "Critical metrics", "The decision framework"]
 
 
 @st.cache_data
@@ -37,7 +37,7 @@ def load_sections() -> tuple[str, dict[str, str]]:
     return preamble, sections
 
 
-def render_mermaid(diagram: str, height: int = 220) -> None:
+def render_mermaid(diagram: str, height: int = 130) -> None:
     # Same fix as the other dashboards in this repo: mermaid's startOnLoad
     # can race Streamlit's own layout pass inside a freshly-mounted tab,
     # rendering the diagram at zero width. Polling for a real width first
@@ -63,7 +63,7 @@ def render_mermaid(diagram: str, height: int = 220) -> None:
     )
 
 
-def render_body(body: str, diagram_height: int = 220) -> None:
+def render_body(body: str, diagram_height: int = 130) -> None:
     last_end = 0
     for match in MERMAID_RE.finditer(body):
         before = body[last_end:match.start()].strip()
@@ -94,18 +94,9 @@ if not DOC_PATH.exists():
 preamble, sections = load_sections()
 
 st.markdown(preamble.split("\n\n", 1)[1] if "\n\n" in preamble else preamble)
-st.caption(
-    "This is a reference framework, not a single experiment. It's synthesized from the three "
-    "experiments already run in this repo (Intent Classification, RAG Architectures, Agentic "
-    "Architectures), plus the empirical follow-on, Evaluation Criteria in Practice, and current "
-    "research on evaluating each system type."
-)
 
-tabs = st.tabs([label for label, _ in TABS])
-for (label, section_titles), tab in zip(TABS, tabs):
-    with tab:
-        for title in section_titles:
-            if title not in sections:
-                continue
-            st.header(title)
-            render_body(sections[title])
+for title in SECTIONS:
+    if title not in sections:
+        continue
+    st.header(title)
+    render_body(sections[title])

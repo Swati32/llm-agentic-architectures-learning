@@ -4,14 +4,10 @@ draft answer is only accepted once a separate Verifier role checks it's
 actually supported by the retrieved evidence; a rejected draft sends the
 Supervisor back to refine the search query and try again.
 
-This is the same architecture as agentic-architectures' "Supervisor +
-Verification Loop", reused here as this experiment's multi-agent
-representative rather than compared against other multi-agent designs,
-because it won that experiment outright (60% exact match versus 47.5% for
-every other architecture there). Picking the strongest real multi-agent
-contender, not a strawman, is what makes a shape-to-shape comparison fair:
-see the README's "Setup" section for why one representative technique per
-shape, not every technique from the prior two experiments, is the point.
+This is this experiment's multi-agent representative: one technique per
+shape, not a survey of every possible multi-agent design, since the point
+of this experiment is comparing shapes against each other, not comparing
+techniques within one shape. See the README's "Setup" section.
 
 Grounded in self-correction/self-critique loops, e.g. Reflexion
 (https://arxiv.org/abs/2303.11366) and Self-Refine
