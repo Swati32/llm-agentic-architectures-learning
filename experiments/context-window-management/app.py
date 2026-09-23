@@ -1,8 +1,7 @@
-"""Streamlit dashboard: methodology, cross-technique comparison (overall,
-by document length, by needle position, and the full length x position
-grid), a technique deep dive (verbatim prompts + how each technique
-works), and a document explorer for comparing every technique's answer
-to the same document side by side.
+"""Streamlit dashboard: methodology, cross-technique comparison (summary,
+overall metrics, by document length, by needle position, and the full
+length x position grid), and a technique deep dive (verbatim prompts +
+how each technique works).
 """
 
 import json
@@ -243,21 +242,6 @@ def render_prompt_block(label: str, prompt: str | None) -> None:
         st.code(prompt, language=None)
 
 
-def render_step_trace(steps: list[dict]) -> None:
-    for i, step in enumerate(steps, start=1):
-        icon = "📝" if step["role"] == "summarizer" else "💬"
-        with st.expander(f"{icon} Step {i}: {step['role']}", expanded=False):
-            st.markdown(f"**Detail:** {step['detail']}")
-            st.markdown(f"**Output:** {step['output']}")
-            cols = st.columns(4)
-            cols[0].metric("Prompt tokens", step["prompt_tokens"])
-            cols[1].metric("Completion tokens", step["completion_tokens"])
-            cols[2].metric("Latency (s)", f"{step['latency_seconds']:.2f}")
-            cols[3].metric("Context bytes", step["context_payload_bytes"])
-            if step["error"]:
-                st.error(f"Error: {step['error']}")
-
-
 def main() -> None:
     render_header()
 
@@ -271,7 +255,7 @@ def main() -> None:
     by_position = quality_by_position(records)
     grid = quality_by_length_and_position(records)
 
-    tabs = st.tabs(["Methodology", "Terminology", "Comparison", "Technique Deep Dive", "Document Explorer"])
+    tabs = st.tabs(["Methodology", "Terminology", "Comparison", "Technique Deep Dive"])
 
     # ---- Methodology -----------------------------------------------------
     with tabs[0]:
@@ -308,6 +292,34 @@ from what each technique put in front of the model, not from different instructi
     # ---- Comparison --------------------------------------------------------
     with tabs[2]:
         st.header("Cross-Technique Comparison")
+
+        st.subheader("Summary and conclusion")
+        st.markdown(
+            "**Full Context won overall (79.5% F1), with Retrieval Selection close behind (76.4%).** "
+            "Retrieval Selection got there at roughly a sixth of the prompt tokens (596 vs. 3,947) and "
+            "about a ninth of the latency (3.5s vs. 32.7s), and at the longest documents it actually "
+            "beat Full Context outright (77.7% vs. 75.6%), the one regime where dumping everything "
+            "into context should hurt most.\n\n"
+            "**Sliding Window fails as a hard, deterministic cutoff, not a gradual decline.** Exactly "
+            "0.0% F1 in every length/position combination where the needle falls outside its "
+            "1,500-word window, and a flat 73.2% wherever it falls inside. There's no partial credit "
+            "for 'almost recent enough'.\n\n"
+            "**Hierarchical Summarization fails softly almost everywhere, but catastrophically "
+            "(0.0% F1, 16 out of 16 documents) whenever the needle lands in the middle of a chunk "
+            "that gets folded into its running summary**, at both medium and long lengths. The same "
+            "technique does fine when the needle survives untouched in the last raw chunk, or sits at "
+            "the very start of the first summarized chunk.\n\n"
+            "**One honest caveat:** Full Context's own position breakdown (middle best at 89.8%, end "
+            "worst at 68.5%) does *not* reproduce the classic lost-in-the-middle U-shape. Each "
+            "(length, position) cell here averages only 8 needles, and inspecting the actual answers "
+            "shows the pattern is driven by 2-3 specific hard questions, not a uniform degradation. "
+            "This run neither confirms nor refutes lost-in-the-middle for Full Context specifically; "
+            "the sample just isn't large enough to say either way. Sliding Window's and Hierarchical "
+            "Summarization's failures, by contrast, reproduce exactly every time, because they follow "
+            "from each technique's mechanics rather than the model's moment-to-moment attention.\n\n"
+            "See the README's *Why these metrics, and which ones actually mattered* section for the "
+            "full reasoning behind each of these."
+        )
 
         st.subheader("Overall metrics")
         display = combined.copy()
@@ -362,36 +374,6 @@ from what each technique put in front of the model, not from different instructi
         for term, definition in TECHNIQUE_METRIC_TERMINOLOGY.items():
             with st.expander(term):
                 st.markdown(definition)
-
-    # ---- Document Explorer --------------------------------------------------
-    with tabs[4]:
-        st.header("Document Explorer")
-        st.markdown("See every technique's answer to the same document, side by side.")
-
-        document_ids = sorted(records["document_id"].unique().tolist())
-        document_lookup = records.drop_duplicates("document_id").set_index("document_id")
-        document_id = st.selectbox(
-            "Document",
-            options=document_ids,
-            format_func=lambda d: f"{d} — {document_lookup.loc[d, 'length']}/{document_lookup.loc[d, 'position']}",
-        )
-        selected = document_lookup.loc[document_id]
-        st.markdown(f"**Question:** {selected['question']}")
-        st.markdown(f"**Gold answer:** {selected['gold_answer']}")
-        st.markdown(f"**Length:** {LENGTH_LABELS.get(selected['length'], selected['length'])} · **Position:** {POSITION_LABELS.get(selected['position'], selected['position'])}")
-
-        document_records = records[records["document_id"] == document_id].set_index("technique")
-        for key, meta in techniques_meta.items():
-            if key not in document_records.index:
-                continue
-            row = document_records.loc[key]
-            with st.expander(f"{meta['name']} — predicted: {row['predicted_answer']}", expanded=False):
-                correct = format_metric("f1", row["f1"])
-                st.markdown(f"**F1:** {correct} · **LLM calls:** {row['llm_calls']} · **Wall-clock:** {row['wall_clock_seconds']:.1f}s")
-                st.markdown("**Context actually sent to the final answer call:**")
-                st.text_area("context", row["context_sent_to_generator"], height=150, key=f"context_{key}", label_visibility="collapsed")
-                st.markdown("**Steps**")
-                render_step_trace(row["steps"])
 
 
 if __name__ == "__main__":
